@@ -1,0 +1,46 @@
+{% load staticfiles %}
+<!DOCTYPE html >
+<html lang="en" {%block html_attribs%}{%endblock html_attribs%}>
+  <title>Tweets</title>
+  <head>
+    <link rel=stylesheet type=text/css href="{% static "css/style.css" %}">
+    <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+  </head>
+  <body>
+    <div class=page>
+      <h1>Tweets Di Feed</h1>
+      <p> 
+        This simple Application will enable you to get RSS Feeds of
+        tweets of people you follow. <br/ ><br/ >
+
+            Because of rate limiting policies of twitter it takes time to
+            compile the list of people you follow so we will DM you the link
+            to OPML file as and when the process finishes.<br/ ><br/ >
+
+                With respect to APP permissions, to DM you the details we will
+                need highest of them. Otherwise we could had done with minimum
+                permissions to get list of people you follow and their latest
+                tweets.<br/ ><br/ >
+      </p>
+      <div class=link>
+        <p>
+          <a href="opml/" id="get-opml">Lets Get Started</a>
+        </p>
+      </div>
+      <div class=status>
+      </div>
+      <div class=metanav>
+        Created by <a href="http://mutables.co/" target="_blank">Mutables</a> with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a>
+      </div>
+      {% block body %}
+      {% endblock %}
+    </div>
+    <script src="{% static "js/status.js" %}"></script>
+    {% if uuid %}
+      <script type="text/javascript">
+        var uuid = "{{ uuid }}";
+        loop_delay(uuid);
+      </script>
+    {% endif %}
+  </body>
+</html>
