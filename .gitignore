@@ -1,0 +1,29 @@
+*.py[co]
+*~
+# Packages
+*.egg
+*.xml
+*.opml
+*.cfg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+develop-eggs
+.installed.cfg
+*.jpg
+*.pdf
+*.tiff
+*.zip
+*.png
+docs/_build
+*.o
+*.so
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
