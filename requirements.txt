@@ -1,0 +1,6 @@
+Django==1.9
+tweepy==3.5.0
+celery==3.1.23
+django-celery==3.1.17
+pytz==2016.6.1
+redis==2.10.5
