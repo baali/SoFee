@@ -57,7 +57,10 @@ def update_rss_task(self):
             if status.created_at < account.last_updated:
                 break
             screen_name = status.author.screen_name
-            text = status.text
+            if status.retweeted_status.text:
+                text = status.text
+            else:
+                text = status.text
             created = status.created_at
             url = 'https://twitter.com/'+screen_name+'/status/'+status.id_str
             fe = fg.add_entry()
@@ -89,7 +92,10 @@ def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
         if not status.author.id_str == friend_id:
             # skipping tweets where someone else is talking to friend
             continue
-        text = status.text
+        if status.retweeted_status.text:
+            text = status.text
+        else:
+            text = status.text
         created = status.created_at
         url = 'https://twitter.com/'+screen_name+'/status/'+status.id_str
         fe = fg.add_entry()
@@ -171,8 +177,3 @@ def opml_task(self, token, verifier, host_uri):
 based on people you follow. You can access it here
 %s Use this file with any feed
 reader of you choice.'''%(host_uri+static('opml/'+me.screen_name+'.opml')))
-    meta = {'info': 'Done compiling list, you can download it from here: %s'%(host_uri+static('opml/'+me.screen_name+'.opml')) ,
-            'count': count,
-            'total': me.friends_count,
-    }
-    self.update_state( state='PROGRESS', meta=meta )
