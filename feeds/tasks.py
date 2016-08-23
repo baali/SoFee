@@ -177,3 +177,4 @@ def opml_task(self, token, verifier, host_uri):
 based on people you follow. You can access it here
 %s Use this file with any feed
 reader of you choice.'''%(host_uri+static('opml/'+me.screen_name+'.opml')))
+    return host_uri+static('opml/'+me.screen_name+'.opml')

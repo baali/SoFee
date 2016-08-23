@@ -23,7 +23,7 @@ function get_status(uuid) {
       }
       else if (data.task_status === 'SUCCESS') {
         $("div.link").text("");
-        $("div.status").html("<p>Finished processing your subscription file please check DM of your twitter account for OPML file details.<br/></p>");
+        $("div.status").html("<p>Done processing your OPML file, you can Download it from <a href=\""+data.info+"\">here</a>.<br/></p>");
       }
     })
     .fail(function() {

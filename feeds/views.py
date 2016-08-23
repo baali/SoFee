@@ -42,7 +42,7 @@ def get_status(request):
     elif task.state == 'FAILURE':
         return JsonResponse({'task_status':task.state,}, status=400)
     elif task.state == 'SUCCESS':
-        return JsonResponse({'task_status':task.state})
+        return JsonResponse({'task_status':task.state, 'info':task.result,})
     else:
         return JsonResponse({'task_status':task.state, 'message':'It is lost'})
 
