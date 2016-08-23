@@ -146,8 +146,6 @@ def opml_task(self, token, verifier, host_uri):
     count = 0
     for friend in tweepy.Cursor(api.friends).items():
         count += 1
-        if count > 5:
-            break
         if not friend.url:
             continue
         print 'Processing user %s' %friend.name
