@@ -57,8 +57,8 @@ def update_rss_task(self):
             if status.created_at < account.last_updated:
                 break
             screen_name = status.author.screen_name
-            if status.retweeted_status.text:
-                text = status.text
+            if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
+                text = status.retweeted_status.text
             else:
                 text = status.text
             created = status.created_at
@@ -92,8 +92,8 @@ def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
         if not status.author.id_str == friend_id:
             # skipping tweets where someone else is talking to friend
             continue
-        if status.retweeted_status.text:
-            text = status.text
+        if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
+            text = status.retweeted_status.text
         else:
             text = status.text
         created = status.created_at
