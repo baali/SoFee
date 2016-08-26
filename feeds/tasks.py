@@ -28,7 +28,7 @@ def update_rss_task(self):
         statuses = api.user_timeline(screen_name=account.screen_name)
         name = friend_url = screen_name = None
         for status in statuses:
-            if status.created_at < account.last_updated:
+            if pytz.utc.localize(status.created_at) < account.last_updated:
                 break
             if status.author.screen_name == account.screen_name:
                 # skipping tweets where someone else is talking to friend
