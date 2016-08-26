@@ -35,9 +35,9 @@ add them to TwitterAccounts table to be picked up by celery scheduler task.'''
             timeline = friend.timeline()
             statuses = [status for status in timeline if status.author.screen_name == friend.screen_name]
             if statuses:
-                last_updated = statuses[0].created_at
+                last_updated = pytz.utc.localize(statuses[0].created_at)
             else:
-                last_updated = datetime.datetime.now()
+                last_updated = pytz.utc.localize(datetime.datetime.now())
             twitter_account = TwitterAccounts.objects.create(screen_name=friend.screen_name, followed_from=auth_token, last_updated=last_updated)
             try:
                 twitter_account.save()
