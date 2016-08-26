@@ -1,9 +1,7 @@
 from django.conf.urls import url
 from views import *
-from django.conf.urls import patterns
 
-urlpatterns = patterns(
-    '', 
+urlpatterns = [
     url (
         r'^$', 
         index, 
@@ -24,9 +22,4 @@ urlpatterns = patterns(
         get_status, 
         name='get_status',
     ),
-    # url (
-    #     r'^rss/$', 
-    #     rss_view, 
-    #     name='rss',
-    # ),
-)
+]
