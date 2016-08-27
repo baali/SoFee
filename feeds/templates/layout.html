@@ -24,10 +24,18 @@
       </p>
       <div class=link>
         <p>
-          <a href="opml/" id="get-opml">Lets Get Started</a>
+          {% if uuid %}
+            <a href="opml/" id="get-opml">Waiting for the process to start...</a>
+          {% else %}
+            <a href="opml/" id="get-opml">Lets Get Started</a>
+          {% endif %}
         </p>
       </div>
       <div class=status>
+        <p>
+        <span class=stats></span><br/>        
+        <span class=list></span>
+        </p>
       </div>
       <div class=metanav>
         Created by <a href="http://mutables.co/" target="_blank">Mutables</a> with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a>

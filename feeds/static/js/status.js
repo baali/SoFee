@@ -12,22 +12,23 @@ function get_status(uuid) {
     .done( function(data) {
       if (data.task_status === 'PENDING') {
         $("div.link").text("");
-        $("div.status").html("<p>Waiting for task to start...<br /></p>");
+        $("span.stats").html("<p>Waiting for task to start...<br /></p>");
         console.log(data);
         get_status(uuid);
       }
       else if (data.task_status === 'PROGRESS') {
         $("div.link").text("");
-        $("div.status").html("<p>Current Status: " + data.info + " <br/> Finished " + data.count + "/" + data.total_count +" friends.<br/></p>");
+        $("span.stats").html("Finished " + data.count + "/" + data.total_count +" friends.");
+        $("span.list").html(data.info);
         get_status(uuid);
       }
       else if (data.task_status === 'SUCCESS') {
         $("div.link").text("");
-        $("div.status").html("<p>Done processing your OPML file, you can Download it from <a href=\""+data.info+"\">here</a>.<br/></p>");
+        $("span.stats").html("<p>Done processing your OPML file, We have DMed you details or you can Download the file from <a href=\""+data.info+"\">here</a>.<br/></p>");
       }
     })
     .fail(function() {
-      $("div.status").html("<p>Sorry for the trouble, We were not able to process your request, please contact baali@muse-amuse.in for clarifications.<br/></p>");
+      $("span.stats").html("<p>Sorry for the trouble, We were not able to process your request, please contact baali@muse-amuse.in for clarifications.<br/></p>");
       console.log( "Task failed" );
     });
 }
