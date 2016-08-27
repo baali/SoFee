@@ -4,6 +4,8 @@ from feeds.tasks import rss_task
 import datetime
 import tweepy
 import ConfigParser
+import pytz
+
 config = ConfigParser.RawConfigParser()
 config.read('keys.cfg')
 import time

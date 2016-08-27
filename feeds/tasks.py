@@ -38,9 +38,9 @@ def update_rss_task(self):
                 break
         # condition when user has not added anything to the timeline
         # since we last parsed their timeline
-        if screen_name == None:
+        if screen_name == None or name == None:
             continue
-        fg = FeedGenerator(name)
+        fg = FeedGenerator()
         fg.id(friend_url)
         fg.description('Tweets by ' + name)
         fg.title(screen_name)
@@ -54,7 +54,7 @@ def update_rss_task(self):
             if not status.author.screen_name == account.screen_name:
                 # skipping tweets where someone else is talking to friend
                 continue
-            if status.created_at < account.last_updated:
+            if pytz.utc.localize(status.created_at) < account.last_updated:
                 break
             screen_name = status.author.screen_name
             if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
@@ -69,12 +69,12 @@ def update_rss_task(self):
             fe.title(text)
             fe.description(text)
             fe.pubdate(pytz.utc.localize(status.created_at))
-            account.last_updated = status.created_at
+            account.last_updated = pytz.utc.localize(status.created_at)
             count += 1
         account.save()
         with open('feeds/static/xml/feed-%s.xml'%account.screen_name, 'w') as feed:
             feed.write(fg.rss_str())
-            print 'Done getting status for user: %s' %account.name
+            print 'Done getting status for user: %s' %account.screen_name
 
 @app.task(bind=True)
 def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
@@ -150,7 +150,7 @@ def opml_task(self, token, verifier, host_uri):
             continue
         print 'Processing user %s' %friend.name
         if friend.url:
-            meta = {'info': 'Processing user %s' %friend.name,
+            meta = {'info': 'Processing user %s/<a href="https://twitter.com/%s">%s</a>' %(friend.name, friend.screen_name, friend.screen_name),
                     'count': count,
                     'total': me.friends_count,
                 }
@@ -165,6 +165,12 @@ def opml_task(self, token, verifier, host_uri):
                                 'xmlUrl':host_uri+static('xml/feed-%s.xml'%friend.screen_name),
                             })
             # Rate limiting(??)
+            last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
+            try:
+                twitter_account = TwitterAccounts.objects.create(screen_name=friend.screen_name, followed_from=auth_token, last_updated=last_updated)
+                twitter_account.save()
+            except:
+                print 'Skipping friend %s for now' %friend.screen_name
             time.sleep(.5)
     with open('feeds/static/opml/%s.opml'%me.screen_name, 'w') as opml:
         rough_string = ElementTree.tostring(root, 'utf-8')
