@@ -54,8 +54,8 @@ def update_rss_task(self):
             if not status.author.screen_name == account.screen_name:
                 # skipping tweets where someone else is talking to friend
                 continue
-            if pytz.utc.localize(status.created_at) < account.last_updated:
-                break
+            if pytz.utc.localize(status.created_at) > account.last_updated:
+                account.last_updated = pytz.utc.localize(status.created_at)
             screen_name = status.author.screen_name
             if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
                 text = status.retweeted_status.text
@@ -69,7 +69,6 @@ def update_rss_task(self):
             fe.title(text)
             fe.description(text)
             fe.pubdate(pytz.utc.localize(status.created_at))
-            account.last_updated = pytz.utc.localize(status.created_at)
             count += 1
         account.save()
         with open('feeds/static/xml/feed-%s.xml'%account.screen_name, 'w') as feed:
