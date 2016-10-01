@@ -11,7 +11,7 @@ import ConfigParser
 # Create your views here.
 config = ConfigParser.RawConfigParser()
 config.read('keys.cfg')
-from models import AuthTokens, TwitterAccounts
+from models import AuthToken, TwitterAccount
 from django.contrib.staticfiles.templatetags.staticfiles import static
 
 @app.task(bind=True)
@@ -50,6 +50,9 @@ def update_rss_task(self):
         # get 10 time line activities for the friend
         count = 0
         current_group = None
+        # Check if there were no recent updates in the timeline by the author
+        if not [status for status in statuses if status.author.screen_name == account.screen_name and pytz.utc.localize(status.created_at) > account.last_updated]:
+            continue
         for status in statuses:
             if not status.author.screen_name == account.screen_name:
                 # skipping tweets where someone else is talking to friend
@@ -73,7 +76,7 @@ def update_rss_task(self):
         account.save()
         with open('feeds/static/xml/feed-%s.xml'%account.screen_name, 'w') as feed:
             feed.write(fg.rss_str())
-            print 'Done getting status for user: %s' %account.screen_name
+            # print 'Done getting status for user: %s' %account.screen_name
 
 @app.task(bind=True)
 def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
@@ -106,7 +109,7 @@ def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
         count += 1
     with open('feeds/static/xml/feed-%s.xml'%screen_name, 'w') as feed:
         feed.write(fg.rss_str())
-        print 'Done getting status for user: %s' %name
+        # print 'Done getting status for user: %s' %name
 
 @app.task(bind=True)
 def opml_task(self, token, verifier, host_uri):
@@ -115,15 +118,15 @@ def opml_task(self, token, verifier, host_uri):
     try:
         auth.get_access_token(verifier)
     except tweepy.TweepError:
-        print 'Error! Failed to get access token.'
+        # print 'Error! Failed to get access token.'
         raise
     try:
         api = tweepy.API(auth, wait_on_rate_limit=True)
     except tweepy.TweepError:
-        print 'Error! Failed to get access token.'
+        # print 'Error! Failed to get access token.'
         raise
     me = api.me()
-    auth_token, created = AuthTokens.objects.get_or_create(screen_name=me.screen_name)
+    auth_token, created = AuthToken.objects.get_or_create(screen_name=me.screen_name)
     auth_token.access_token=auth.access_token
     auth_token.access_token_secret=auth.access_token_secret
     auth_token.save()
@@ -141,13 +144,11 @@ def opml_task(self, token, verifier, host_uri):
     dm.text = generated_on
 
     body = SubElement(root, 'body')
-    print ElementTree.tostring(root)
     count = 0
     for friend in tweepy.Cursor(api.friends).items():
         count += 1
         if not friend.url:
             continue
-        print 'Processing user %s' %friend.name
         if friend.url:
             meta = {'info': 'Processing user %s/<a href="https://twitter.com/%s">%s</a>' %(friend.name, friend.screen_name, friend.screen_name),
                     'count': count,
@@ -166,7 +167,7 @@ def opml_task(self, token, verifier, host_uri):
             # Rate limiting(??)
             last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
             try:
-                twitter_account = TwitterAccounts.objects.create(screen_name=friend.screen_name, followed_from=auth_token, last_updated=last_updated)
+                twitter_account = TwitterAccount.objects.create(screen_name=friend.screen_name, followed_from=auth_token, last_updated=last_updated)
                 twitter_account.save()
             except:
                 print 'Skipping friend %s for now' %friend.screen_name

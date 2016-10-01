@@ -4,3 +4,4 @@ celery==3.1.23
 django-celery==3.1.17
 pytz==2016.6.1
 redis==2.10.5
+feedgen==0.3.2
