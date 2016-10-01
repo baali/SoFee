@@ -27,3 +27,4 @@ pip-log.txt
 
 # Unit test / coverage reports
 .coverage
+/tweet_d_feed/settings.conf

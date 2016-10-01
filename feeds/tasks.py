@@ -7,17 +7,15 @@ from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, Comment, tostring
 from xml.dom import minidom
 import datetime
-import ConfigParser
-# Create your views here.
-config = ConfigParser.RawConfigParser()
-config.read('keys.cfg')
 from models import AuthToken, TwitterAccount
 from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.conf import settings
 
 @app.task(bind=True)
 def update_rss_task(self):
     for account in TwitterAccounts.objects.all():
-        auth = tweepy.OAuthHandler(config.get('twitter', 'consumer_key'), config.get('twitter', 'consumer_secret'))
+        auth = tweepy.OAuthHandler(settings.TWITTER_CONSUMER_KEY,
+                                   settings.TWITTER_CONSUMER_SECRET)
         auth_token = account.followed_from
         auth.set_access_token(auth_token.access_token, auth_token.access_token_secret)
         try:
@@ -176,7 +174,7 @@ def opml_task(self, token, verifier, host_uri):
         rough_string = ElementTree.tostring(root, 'utf-8')
         reparsed = minidom.parseString(rough_string)
         opml.write(reparsed.toprettyxml(indent="  ").encode('utf8'))
-    api.send_direct_message(screen_name=me.screen_name, 
+    api.send_direct_message(screen_name=me.screen_name,
                             text='''Hey there! We just finished compiling OPML file of the RSS feed
 based on people you follow. You can access it here
 %s Use this file with any feed

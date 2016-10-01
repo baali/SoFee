@@ -1,12 +1,9 @@
-from django.shortcuts import render, redirect, render_to_response
-from django.http import HttpResponse, JsonResponse
-import ConfigParser
-# Create your views here.
-config = ConfigParser.RawConfigParser()
-config.read('keys.cfg')
+from django.conf import settings
+from django.shortcuts import redirect, render_to_response
+from django.http import JsonResponse, Http404
+
 import tweepy
 from tasks import *
-from django.core.urlresolvers import reverse
 
 session = {}
 
@@ -14,20 +11,25 @@ def index(request):
     return render_to_response('layout.html')
 
 def get_opml(request):
-    auth = tweepy.OAuthHandler(config.get('twitter', 'consumer_key'), config.get('twitter', 'consumer_secret'), 'http://'+request.get_host()+'/verify/')
-    try: 
+    auth = tweepy.OAuthHandler(
+        settings.TWITTER_CONSUMER_KEY,
+        settings.TWITTER_CONSUMER_SECRET,
+        'http://'+request.get_host()+'/verify/'
+    )
+    try:
         #get the request tokens
         redirect_url= auth.get_authorization_url()
         session['request_token'] = auth.request_token
-    except tweepy.TweepError:
-        print 'Error! Failed to get request token'
-    return redirect(redirect_url) 
+        return redirect(redirect_url)
+
+    except tweepy.TweepError as e:
+        raise Http404(e)
 
 def get_verification(request):
     #get the verifier key from the request url
     verifier= request.GET.get('oauth_verifier')
     if 'request_token' not in session:
-        return redirect('/') 
+        return redirect('/')
     token = session['request_token']
     job = opml_task.apply_async([token, verifier, 'http://'+request.get_host()])
     session.pop('request_token')
@@ -45,4 +47,3 @@ def get_status(request):
         return JsonResponse({'task_status':task.state, 'info':task.result,})
     else:
         return JsonResponse({'task_status':task.state, 'message':'It is lost'})
-

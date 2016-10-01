@@ -13,16 +13,19 @@ from __future__ import absolute_import
 
 import os
 
+def get_env(key):
+    value = os.getenv(key)
+    assert value, 'Set {} environment variable'
+    return value
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.9/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
-assert SECRET_KEY, 'Set DJANGO_SECRET_KEY environment variable'
+SECRET_KEY = get_env('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -138,3 +141,8 @@ CELERY_ROUTES = {
     'feeds.tasks.opml_task': {'queue': 'default'},
     'feeds.tasks.update_rss_task': {'queue': 'rss_queue'},
 }
+
+
+# Twitter settings
+TWITTER_CONSUMER_KEY = get_env('TWITTER_CONSUMER_KEY')
+TWITTER_CONSUMER_SECRET = get_env('TWITTER_CONSUMER_SECRET')
