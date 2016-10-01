@@ -3,7 +3,8 @@ from django.shortcuts import redirect, render_to_response
 from django.http import JsonResponse, Http404
 
 import tweepy
-from tasks import *
+
+from feeds.tasks import opml_task
 
 session = {}
 

@@ -1,25 +1,26 @@
 from django.conf.urls import url
-from views import *
+
+from feeds import views
 
 urlpatterns = [
     url (
-        r'^$', 
-        index, 
+        r'^$',
+        views.index,
         name='index',
     ),
     url (
-        r'^opml/$', 
-        get_opml, 
+        r'^opml/$',
+        views.get_opml,
         name='get_feeds',
     ),
     url (
-        r'^verify/$', 
-        get_verification, 
+        r'^verify/$',
+        views.get_verification,
         name='auth_api',
     ),
     url (
-        r'^get_status/$', 
-        get_status, 
+        r'^get_status/$',
+        views.get_status,
         name='get_status',
     ),
 ]
