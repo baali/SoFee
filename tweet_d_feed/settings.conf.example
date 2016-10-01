@@ -1,0 +1,6 @@
+# Django config
+export DJANGO_SECRET_KEY=''
+
+# Twitter config
+export TWITTER_CONSUMER_KEY=''
+export TWITTER_CONSUMER_SECRET=''
