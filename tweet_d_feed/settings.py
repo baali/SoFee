@@ -13,6 +13,7 @@ from __future__ import absolute_import
 
 import os
 
+
 def get_env(key):
     value = os.getenv(key)
     assert value, 'Set {} environment variable'

@@ -3,22 +3,22 @@ from django.conf.urls import url
 from feeds import views
 
 urlpatterns = [
-    url (
+    url(
         r'^$',
         views.index,
         name='index',
     ),
-    url (
+    url(
         r'^opml/$',
         views.get_opml,
         name='get_feeds',
     ),
-    url (
+    url(
         r'^verify/$',
         views.get_verification,
         name='auth_api',
     ),
-    url (
+    url(
         r'^get_status/$',
         views.get_status,
         name='get_status',
