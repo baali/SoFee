@@ -1,10 +1,11 @@
 from django.test import TestCase
 import os
 import tweepy
-from feeds.models import *
-from feeds.serializers import *
+from feeds.models import AuthToken, TwitterAccount, TwitterStatus, TwitterLink
+from feeds.serializers import StatusSerializer, LinkSerializer
 import pytz
 import datetime
+
 
 class SerializerTests(TestCase):
     @classmethod
@@ -20,14 +21,16 @@ class SerializerTests(TestCase):
         cls.api = tweepy.API(cls.auth, wait_on_rate_limit=True)
         cls.me = cls.api.me()
         auth_token, created = AuthToken.objects.get_or_create(screen_name=cls.me.screen_name)
-        auth_token.access_token=cls.oauth_token
-        auth_token.access_token_secret=cls.oauth_token_secret
+        auth_token.access_token = cls.oauth_token
+        auth_token.access_token_secret = cls.oauth_token_secret
         auth_token.save()
         for friend in tweepy.Cursor(cls.api.friends).items():
             if not friend.url:
                 continue
             last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
-            twitter_account = TwitterAccount.objects.create(screen_name=friend.screen_name, followed_from=auth_token, last_updated=last_updated)
+            twitter_account = TwitterAccount.objects.create(screen_name=friend.screen_name,
+                                                            followed_from=auth_token,
+                                                            last_updated=last_updated)
             twitter_account.save()
             break
         cls.statuses = cls.api.user_timeline(screen_name=friend.screen_name)
@@ -43,16 +46,16 @@ class SerializerTests(TestCase):
             if pytz.utc.localize(status.created_at) > self.friend_account.last_updated:
                 self.friend_account.last_updated = pytz.utc.localize(status.created_at)
             if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
-                text = self.friend_account.screen_name + ' Retweeted '+ status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.text
+                text = self.friend_account.screen_name + ' Retweeted ' + status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.text
             else:
                 text = status.text
             created = pytz.utc.localize(status.created_at)
-            url = 'https://twitter.com/'+self.friend_account.screen_name+'/status/'+status.id_str
+            url = 'https://twitter.com/' + self.friend_account.screen_name + '/status/' + status.id_str
             status_obj = TwitterStatus.objects.create(
-                tweet_from=self.friend_account, 
-                followed_from=auth_token, 
+                tweet_from=self.friend_account,
+                followed_from=auth_token,
                 status_text=text,
-                status_created=created, 
+                status_created=created,
                 status_url=url)
             status_obj.save()
 
@@ -63,7 +66,6 @@ class SerializerTests(TestCase):
             self.assertEqual(serialized_obj.data['tweet_from'], self.friend_account.uuid)
             self.assertEqual(serialized_obj.data['followed_from'], auth_token.uuid)
         self.friend_account.save()
-
 
     def test_links_serializer(self):
         auth_token, created = AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
