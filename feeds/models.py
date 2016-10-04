@@ -17,7 +17,10 @@ class AuthToken(UUIDMixin):
 class TwitterAccount(UUIDMixin):
     screen_name = models.CharField(max_length=60, unique=True)
     followed_from = models.ForeignKey(AuthToken, on_delete=models.CASCADE)
-    last_updated = models.DateTimeField()
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = (("screen_name", "followed_from"),)
 
     def __str__(self):
         return self.screen_name
