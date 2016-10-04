@@ -42,7 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
     'djcelery',
+    'rest_framework',
 ]
 
 INSTALLED_APPS += [
@@ -147,3 +149,11 @@ CELERY_ROUTES = {
 # Twitter settings
 TWITTER_CONSUMER_KEY = get_env('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = get_env('TWITTER_CONSUMER_SECRET')
+
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ]
+}
