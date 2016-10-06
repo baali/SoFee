@@ -89,11 +89,8 @@ def check_key(request):
     Check to see if we already have an access_key stored, if we do then we have already gone through
     OAuth. If not then we haven't and we probably need to.
     """
-    try:
-        access_key = request.session.get('access_key_tw', None)
-        if not access_key:
-            return False
-    except KeyError:
+    access_key = request.session.get('access_key_tw', None)
+    if not access_key:
         return False
     return True
 
