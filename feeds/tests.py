@@ -15,8 +15,8 @@ class FeedsTest(TestCase):
     def setUpClass(cls):
         """
         """
-        cls.oauth_consumer_key = os.environ.get('CONSUMER_KEY', '')
-        cls.oauth_consumer_secret = os.environ.get('CONSUMER_SECRET', '')
+        cls.oauth_consumer_key = os.environ.get('TWITTER_CONSUMER_KEY', '')
+        cls.oauth_consumer_secret = os.environ.get('TWITTER_CONSUMER_SECRET', '')
         cls.oauth_token = os.environ.get('ACCESS_KEY', '')
         cls.oauth_token_secret = os.environ.get('ACCESS_SECRET', '')
         cls.auth = tweepy.OAuthHandler(cls.oauth_consumer_key, cls.oauth_consumer_secret)
