@@ -2,13 +2,15 @@ from django.test import TestCase
 import os
 import tweepy
 import pytz
-# from django.contrib.staticfiles import finders
+from django.contrib.staticfiles import finders
 from django.test import Client
 from django.core.urlresolvers import reverse
 from feeds import models
 import datetime
 from rest_framework import status
 from uuid import uuid4
+from rest_framework.test import APIClient
+
 
 class FeedsTest(TestCase):
     @classmethod
@@ -92,11 +94,18 @@ class FeedsTest(TestCase):
         """
         pass
 
-    def test_get_xml(self):
+    def test_get_feed_xml(self):
         """
         Tests to make sure we are able to download xml file.
+        Enabling this for just Links at the moment.
         """
-        pass
+        auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
+        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        # When: we pass feed parameter for user
+        response = self.client.get(url, data={'feed':'1'})
+        # Then: We are returned XML created from tweets
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(finders.find('xml/%s-feed.xml' %auth_token.uuid))
 
     def test_xml_content(self):
         """Tweet something using tweepy and making sure tweet gets reflected
@@ -140,14 +149,25 @@ class FeedsTest(TestCase):
         self.assertIn('http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/',
                       [shared_url['url'] for shared_url in response.data])
         # When: We post a url with all query parameters.
-        response = self.client.post(url, data={'url_shared':'http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/?utm_source=qzfb'}, format='json')
+        response = self.client.post(url, data={'url_shared':'http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         response = self.client.get(url)
         # Then: Only base URL without query string should be part of URL sahred
-        self.assertIn('http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/',
+        self.assertIn('http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html',
                       [shared_url['url'] for shared_url in response.data])
         # Then: Also make sure that url with query-params is not there.
-        self.assertNotIn('http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/?utm_source=qzfb',
+        self.assertNotIn('http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur',
+                         [shared_url['url'] for shared_url in response.data])
+
+        # When: We post a url with all query parameters.
+        response = self.client.post(url, data={'url_shared':'http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        response = self.client.get(url)
+        # Then: Only base URL without query string should be part of URL sahred
+        self.assertIn('http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339',
+                      [shared_url['url'] for shared_url in response.data])
+        # Then: Also make sure that url with query-params is not there.
+        self.assertNotIn('http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC',
                          [shared_url['url'] for shared_url in response.data])
 
         

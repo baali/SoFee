@@ -11,6 +11,7 @@ from rest_framework import viewsets, pagination, status
 from rest_framework.response import Response
 from urllib import parse
 from rest_framework.decorators import api_view
+from feedgen.feed import FeedGenerator
 
 session = {}
 
@@ -24,27 +25,45 @@ class CursorPagination(pagination.CursorPagination):
 @api_view(['GET', 'POST'])
 def url_list(request, uuid):
     if request.method == 'GET':
-        get_rss = request.query_params.get("rss", None)
-        seen = request.query_params.get("seen", False)
-        links_of = request.query_params.get("links_of", '')
-        if get_rss:
+        get_feed = request.query_params.get('feed', None)
+        seen = request.query_params.get('seen', False)
+        links_of = request.query_params.get('links_of', '')
+        if TwitterAccount.objects.filter(followed_from__uuid=uuid).exists():
+            accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
+        else:
+            raise Http404
+        if get_feed:
             # Function to get RSS feed
             rss_file = ''
-            return Response({'rss': rss_file})
+            # FIXME: should we use dragnet for getting content of URL?
+            screen_name = accounts.first().followed_from.get(uuid=uuid).screen_name
+            fg = FeedGenerator()
+            fg.id('https://twitter.com/%s'%screen_name)
+            fg.description('Links shared by people you follow')
+            fg.title(screen_name)
+            fg.author({'name': screen_name})
+            fg.link(href='https://twitter.com/%s'%screen_name, rel='alternate')
+            fg.language('en')
+            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts]):
+                fe = fg.add_entry()
+                fe.id(link.url)
+                fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
+                fe.title(link.url)
+                fe.description(link.url)
+                fe.pubdate(link.url_shared)
+            with open('feeds/static/xml/%s-feed.xml' % uuid, 'wb') as feed:
+                feed.write(fg.rss_str())
+            return Response({'rss': 'SomeFileLocation'}, status=status.HTTP_200_OK)
         else:
-            if TwitterAccount.objects.filter(followed_from__uuid=uuid).exists():
-                accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
-                if links_of:
-                    if TwitterAccount.objects.filter(uuid=links_of):
-                        links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen)
-                    else:
-                        raise Http404
+            if links_of:
+                if TwitterAccount.objects.filter(uuid=links_of):
+                    links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen)
                 else:
-                    links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen)
-                serialized_links = UrlSerializer(links, many=True)
-                return Response(serialized_links.data, status=status.HTTP_200_OK)
+                    raise Http404
             else:
-                raise Http404
+                links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen)
+            serialized_links = UrlSerializer(links, many=True)
+            return Response(serialized_links.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         url_shared = request.data.get('url_shared', '')
         if uuid:
@@ -54,6 +73,7 @@ def url_list(request, uuid):
             except AuthToken.DoesNotExist:
                 raise ValidationError('You are not authorized to archive link on this service')
             parsed_url = parse.urlparse(url_shared)
+            # FIXME: YouTube URLs would be totally screwed by this.
             cleaned_url = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
             if cleaned_url:
                 url_obj, created = UrlShared.objects.get_or_create(url=cleaned_url)
