@@ -46,7 +46,7 @@ def url_list(request, uuid):
             else:
                 raise Http404
     elif request.method == 'POST':
-        url_shared = request.data.get("url_shared", '')
+        url_shared = request.data.get('url_shared', '')
         if uuid:
             try:
                 oauth_account = AuthToken.objects.get(uuid=uuid)

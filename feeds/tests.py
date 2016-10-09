@@ -139,6 +139,16 @@ class FeedsTest(TestCase):
         # Then: The url we just posted should also be returned in list
         self.assertIn('http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/',
                       [shared_url['url'] for shared_url in response.data])
+        # When: We post a url with all query parameters.
+        response = self.client.post(url, data={'url_shared':'http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/?utm_source=qzfb'}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        response = self.client.get(url)
+        # Then: Only base URL without query string should be part of URL sahred
+        self.assertIn('http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/',
+                      [shared_url['url'] for shared_url in response.data])
+        # Then: Also make sure that url with query-params is not there.
+        self.assertNotIn('http://qz.com/797831/the-h4-visa-and-the-desperation-of-indian-housewives-in-america/?utm_source=qzfb',
+                         [shared_url['url'] for shared_url in response.data])
 
         
     def test_tweet_links_individual(self):
