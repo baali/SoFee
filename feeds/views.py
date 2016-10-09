@@ -1,14 +1,16 @@
 from django.conf import settings
 from django.shortcuts import redirect, render_to_response
 from django.http import JsonResponse, Http404
-
+from rest_framework.serializers import ValidationError
 import tweepy
 from feeds.tasks import opml_task
 from django.contrib.auth import logout
-from feeds.models import TwitterLink, TwitterStatus, TwitterAccount
-from feeds.serializers import LinkSerializer, StatusSerializer
-from rest_framework import viewsets, pagination
+from feeds.models import UrlShared, TwitterStatus, TwitterAccount, AuthToken
+from feeds.serializers import UrlSerializer, StatusSerializer
+from rest_framework import viewsets, pagination, status
 from rest_framework.response import Response
+from urllib import parse
+from rest_framework.decorators import api_view
 
 session = {}
 
@@ -19,15 +21,12 @@ class CursorPagination(pagination.CursorPagination):
     max_page_size = 1000
 
 
-class LinkViewSet(viewsets.ModelViewSet):
-    lookup_field = 'uuid'
-    serializer_class = LinkSerializer
-    # pagination_class = CursorPagination
-
-    def get_queryset(self):
-        uuid = self.kwargs["uuid"]
-        get_rss = self.request.query_params.get("rss", None)
-        seen = self.request.query_params.get("seen", False)
+@api_view(['GET', 'POST'])
+def url_list(request, uuid):
+    if request.method == 'GET':
+        get_rss = request.query_params.get("rss", None)
+        seen = request.query_params.get("seen", False)
+        links_of = request.query_params.get("links_of", '')
         if get_rss:
             # Function to get RSS feed
             rss_file = ''
@@ -35,10 +34,39 @@ class LinkViewSet(viewsets.ModelViewSet):
         else:
             if TwitterAccount.objects.filter(followed_from__uuid=uuid).exists():
                 accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
-                links = TwitterLink.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen)
-                return links
+                if links_of:
+                    if TwitterAccount.objects.filter(uuid=links_of):
+                        links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen)
+                    else:
+                        raise Http404
+                else:
+                    links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen)
+                serialized_links = UrlSerializer(links, many=True)
+                return Response(serialized_links.data, status=status.HTTP_200_OK)
             else:
                 raise Http404
+    elif request.method == 'POST':
+        url_shared = request.data.get("url_shared", '')
+        if uuid:
+            try:
+                oauth_account = AuthToken.objects.get(uuid=uuid)
+                twitter_account = TwitterAccount.objects.get(screen_name=oauth_account.screen_name)
+            except AuthToken.DoesNotExist:
+                raise ValidationError('You are not authorized to archive link on this service')
+            parsed_url = parse.urlparse(url_shared)
+            cleaned_url = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
+            if cleaned_url:
+                url_obj, created = UrlShared.objects.get_or_create(url=cleaned_url)
+                if created:
+                    url_obj.save()
+                url_obj.shared_from.add(twitter_account)
+                url_obj.save()
+                serialized_obj = UrlSerializer(url_obj)
+                return Response(serialized_obj.data, status=status.HTTP_201_CREATED)
+            else:
+                raise ValidationError('Missing url.')
+        else:
+            raise ValidationError('You are not authorized to archive link on this service')
 
 
 class StatusViewSet(viewsets.ModelViewSet):

@@ -8,7 +8,7 @@ from django.core.urlresolvers import reverse
 from feeds import models
 import datetime
 from rest_framework import status
-
+from uuid import uuid4
 
 class FeedsTest(TestCase):
     @classmethod
@@ -27,13 +27,22 @@ class FeedsTest(TestCase):
         auth_token.access_token = cls.oauth_token
         auth_token.access_token_secret = cls.oauth_token_secret
         auth_token.save()
+        self_account, created = models.TwitterAccount.objects.get_or_create(screen_name=cls.me.screen_name)
+        if created:
+            self_account.save()
+        self_account.followed_from.add(auth_token)
+        last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
+        self_account.last_updated = last_updated
+        self_account.save()
+
         friends_counter = 0
         for friend in tweepy.Cursor(cls.api.friends).items():
             if not friend.url:
-                continue
-            last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
-            twitter_account, created = models.TwitterAccount.objects.get_or_create(screen_name=friend.screen_name,
-                                                                                   followed_from=auth_token)
+                continue            
+            twitter_account, created = models.TwitterAccount.objects.get_or_create(screen_name=friend.screen_name)
+            if created:
+                twitter_account.save()
+            twitter_account.followed_from.add(auth_token)
             twitter_account.last_updated = last_updated
             twitter_account.save()
             statuses = cls.api.user_timeline(screen_name=friend.screen_name)
@@ -57,11 +66,13 @@ class FeedsTest(TestCase):
                 if tweet._json['entities'].get('urls', []):
                     for url_entity in tweet._json['entities']['urls']:
                         if url_entity.get('expanded_url', ''):
-                            created = pytz.utc.localize(tweet.created_at)
-                            link_obj = models.TwitterLink.objects.create(
+                            shared_at = pytz.utc.localize(tweet.created_at)
+                            link_obj, created = models.UrlShared.objects.get_or_create(
                                 url=url_entity['expanded_url'],
-                                shared_from=twitter_account,
-                                url_shared=created)
+                                url_shared=shared_at)
+                            if created:
+                                link_obj.save()
+                            link_obj.shared_from.add(twitter_account)
                             link_obj.save()
 
             friends_counter += 1
@@ -72,7 +83,7 @@ class FeedsTest(TestCase):
     def tearDownClass(cls):
         pass
 
-    def SetUp(self):
+    def setUp(self):
         self.client = Client()
 
     def test_get_opml(self):
@@ -103,7 +114,50 @@ class FeedsTest(TestCase):
         url = reverse('links', kwargs={'uuid': auth_token.uuid})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), models.TwitterLink.objects.count())
+        self.assertEqual(len(response.data), models.UrlShared.objects.count())
+        # When: we use random UUID and query for links
+        url = reverse('links', kwargs={'uuid': str(uuid4())})
+        response = self.client.get(url)
+        # Then: we get 404, NotFound response
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_tweet_links_post(self):
+        """Tests to post link and store it.
+
+        """
+        auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
+        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        # Do: Get a random UUID existing in records
+        random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
+        # When: We make request with url to be stored
+        response = self.client.post(url, data={'url_shared':'http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/'}, format='json')
+        # Then: we get 201, Created
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        # When: We query for links shared by this user.
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Then: The url we just posted should also be returned in list
+        self.assertIn('http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/',
+                      [shared_url['url'] for shared_url in response.data])
+
+        
+    def test_tweet_links_individual(self):
+        """Tests to confirm that fetching links shared by single account
+works.
+
+        """
+        auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
+        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        # Do: Get a random UUID existing in records
+        random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
+        # When: We make request with parameter 'links_of'
+        response = self.client.get(url, data={'links_of':random_existing_uuid})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), models.UrlShared.objects.filter(shared_from__uuid=random_existing_uuid).count())
+        # When: we use random UUID and query for links
+        response = self.client.get(url, data={'links_of':str(uuid4())})
+        # Then: we get 404, NotFound response
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_consolidated_feed(self):
         """Tests to get consolidated feed of all users account it following.
@@ -118,6 +172,12 @@ class FeedsTest(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), models.TwitterStatus.objects.filter(followed_from__uuid=auth_token.uuid).count())
+
+        # When: we use random UUID and query for links
+        url = reverse('links', kwargs={'uuid': str(uuid4())})
+        response = self.client.get(url)
+        # Then: we get 404, NotFound response
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_archived_links(self):
         """Tests to make sure links shared on timeline are getting archived.
