@@ -1,8 +1,8 @@
 from django.test import TestCase
 import os
 import tweepy
-from feeds.models import AuthToken, TwitterAccount, TwitterStatus, TwitterLink
-from feeds.serializers import StatusSerializer, LinkSerializer
+from feeds.models import AuthToken, TwitterAccount, TwitterStatus, UrlShared
+from feeds.serializers import StatusSerializer, UrlSerializer
 import pytz
 import datetime
 
@@ -29,9 +29,9 @@ class SerializerTests(TestCase):
                 continue
             last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
             twitter_account = TwitterAccount.objects.create(screen_name=friend.screen_name,
-                                                            followed_from=auth_token,
                                                             last_updated=last_updated)
             twitter_account.save()
+            twitter_account.followed_from.add(auth_token)
             break
         cls.statuses = cls.api.user_timeline(screen_name=friend.screen_name)
         cls.friend_account = twitter_account
@@ -43,8 +43,6 @@ class SerializerTests(TestCase):
     def test_tweets_serializer(self):
         auth_token, created = AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
         for status in self.statuses:
-            if pytz.utc.localize(status.created_at) > self.friend_account.last_updated:
-                self.friend_account.last_updated = pytz.utc.localize(status.created_at)
             if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
                 text = self.friend_account.screen_name + ' Retweeted ' + status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.text
             else:
@@ -65,21 +63,22 @@ class SerializerTests(TestCase):
             self.assertEqual(serialized_obj.data['status_url'], url)
             self.assertEqual(serialized_obj.data['tweet_from'], self.friend_account.uuid)
             self.assertEqual(serialized_obj.data['followed_from'], auth_token.uuid)
-        self.friend_account.save()
 
     def test_links_serializer(self):
         auth_token, created = AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
         for status in self.statuses:
-            if status._json['entities'].get('urls', []):
-                for url_entity in status._json['entities']['urls']:
-                    if url_entity.get('expanded_url', ''):
-                        created = pytz.utc.localize(status.created_at)
-                        link_obj = TwitterLink.objects.create(
-                            url=url_entity['expanded_url'],
-                            shared_from=self.friend_account,
-                            url_shared=created)
-                        link_obj.save()
-                        serialized_obj = LinkSerializer(link_obj)
-                        self.assertTrue(serialized_obj.data)
-                        self.assertEqual(serialized_obj.data['url'], url_entity['expanded_url'])
-                        self.assertEqual(serialized_obj.data['shared_from'], self.friend_account.uuid)
+            for url_entity in status._json['entities'].get('urls', []):
+                if not url_entity.get('expanded_url', ''):
+                    continue
+                shared_at = pytz.utc.localize(status.created_at)
+                link_obj, created = UrlShared.objects.get_or_create(
+                    url=url_entity['expanded_url'],
+                    url_shared=shared_at)
+                if created:
+                    link_obj.save()
+                link_obj.shared_from.add(self.friend_account)
+                link_obj.save()
+                serialized_obj = UrlSerializer(link_obj)
+                self.assertTrue(serialized_obj.data)
+                self.assertEqual(serialized_obj.data['url'], url_entity['expanded_url'])
+                self.assertEqual(serialized_obj.data['shared_from'][0], str(self.friend_account.uuid))

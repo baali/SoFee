@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from feeds.models import TwitterLink, TwitterStatus
+from feeds.models import UrlShared, TwitterStatus
 
 
-class LinkSerializer(serializers.ModelSerializer):
+class UrlSerializer(serializers.ModelSerializer):
     class Meta:
-        model = TwitterLink
+        model = UrlShared
         fields = ('uuid', 'url', 'shared_from', 'url_shared', 'url_seen')
 
 
