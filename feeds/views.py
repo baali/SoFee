@@ -43,6 +43,7 @@ def url_list(request, uuid):
             rss_file = ''
             # FIXME: should we use dragnet for getting content of URL?
             screen_name = accounts.first().followed_from.get(uuid=uuid).screen_name
+            feed_date = parser.parse(request.query_params.get('date', datetime.date.today().strftime('%d-%b-%Y')))
             fg = FeedGenerator()
             fg.id('https://twitter.com/%s'%screen_name)
             fg.description('Links shared by people you follow')
@@ -50,17 +51,20 @@ def url_list(request, uuid):
             fg.author({'name': screen_name})
             fg.link(href='https://twitter.com/%s'%screen_name, rel='alternate')
             fg.language('en')
-            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts]):
+            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date):
                 fe = fg.add_entry()
                 fe.id(link.url)
                 fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
                 fe.title(link.url)
-                fe.description(link.url)
+                fe.content(link.url)
                 fe.pubdate(link.url_shared)
             with open('feeds/static/xml/%s-feed.xml' % uuid, 'wb') as feed:
-                feed.write(fg.rss_str())
-            return Response({'rss': 'SomeFileLocation'}, status=status.HTTP_200_OK)
+                feed.write(fg.atom_str(pretty=True))
+            return Response({'xml_file': 'xml/%s-feed.xml' % uuid, 'date':feed_date.strftime('%d %b %Y')}, status=status.HTTP_200_OK)
         else:
+            # To return links shared only in last 24 hours
+            # time_threshold = timezone.now() - datetime.timedelta(hours=24)
+            # url_shared__gte=time_threshold
             if links_of:
                 if TwitterAccount.objects.filter(uuid=links_of):
                     links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen)
