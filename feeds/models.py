@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 from django.db import models
 from feeds.mixins import UUIDMixin
 # from django.contrib.postgres.fields import JSONField
+from django.utils import timezone
 
 # Create your models here.
 
@@ -17,7 +18,7 @@ class AuthToken(UUIDMixin):
 class TwitterAccount(UUIDMixin):
     screen_name = models.CharField(max_length=60, unique=True)
     followed_from = models.ManyToManyField(AuthToken)
-    last_updated = models.DateTimeField(auto_now=True)
+    last_updated = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return self.screen_name
@@ -45,7 +46,7 @@ class UrlShared(UUIDMixin):
     # archived/shared from other sources too(browser-extension etc).
     url = models.URLField(db_index=True)
     shared_from = models.ManyToManyField(TwitterAccount)
-    url_shared = models.DateTimeField(auto_now=True)
+    url_shared = models.DateTimeField(default=timezone.now)
     url_seen = models.BooleanField(default=False)
     # tweet_json = JSONField(default={})
 
