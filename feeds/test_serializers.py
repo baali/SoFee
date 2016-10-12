@@ -72,7 +72,7 @@ class SerializerTests(TestCase):
                     continue
                 shared_at = pytz.utc.localize(status.created_at)
                 link_obj, created = UrlShared.objects.get_or_create(
-                    url=url_entity['expanded_url'], defaults={'url_shared':shared_at})
+                    url=url_entity['expanded_url'], defaults={'url_shared': shared_at})
                 if created:
                     link_obj.save()
                 link_obj.shared_from.add(self.friend_account)

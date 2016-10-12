@@ -17,7 +17,7 @@ from xml.etree.ElementTree import Element, SubElement, Comment
 from xml.dom import minidom
 from xml.etree import ElementTree
 import datetime
-from django.utils import timezone
+# from django.utils import timezone
 from dateutil import parser
 
 session = {}
@@ -40,17 +40,15 @@ def url_list(request, uuid):
         else:
             raise Http404
         if get_feed:
-            # Function to get RSS feed
-            rss_file = ''
             # FIXME: should we use dragnet for getting content of URL?
             screen_name = accounts.first().followed_from.get(uuid=uuid).screen_name
             feed_date = parser.parse(request.query_params.get('date', datetime.date.today().strftime('%d-%b-%Y')))
             fg = FeedGenerator()
-            fg.id('https://twitter.com/%s'%screen_name)
+            fg.id('https://twitter.com/%s' % screen_name)
             fg.description('Links shared by people you follow')
             fg.title(screen_name)
             fg.author({'name': screen_name})
-            fg.link(href='https://twitter.com/%s'%screen_name, rel='alternate')
+            fg.link(href='https://twitter.com/%s' % screen_name, rel='alternate')
             fg.language('en')
             for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date):
                 fe = fg.add_entry()
@@ -61,7 +59,7 @@ def url_list(request, uuid):
                 fe.pubdate(link.url_shared)
             with open('feeds/static/xml/%s-feed.xml' % uuid, 'wb') as feed:
                 feed.write(fg.atom_str(pretty=True))
-            return Response({'xml_file': 'xml/%s-feed.xml' % uuid, 'date':feed_date.strftime('%d %b %Y')}, status=status.HTTP_200_OK)
+            return Response({'xml_file': 'xml/%s-feed.xml' % uuid, 'date': feed_date.strftime('%d %b %Y')}, status=status.HTTP_200_OK)
         else:
             # To return links shared only in last 24 hours
             # time_threshold = timezone.now() - datetime.timedelta(hours=24)
@@ -141,8 +139,8 @@ def opml(request, uuid):
                    {'text': 'Links',
                     'title': 'Feeds of all links shared by people you follow.',
                     'type': 'rss',
-                    'htmlUrl': host_uri + 'links/%s/'%uuid,
-                    'xmlUrl': host_uri + 'links/%s/?feed=1'%uuid,
+                    'htmlUrl': host_uri + 'links/%s/' % uuid,
+                    'xmlUrl': host_uri + 'links/%s/?feed=1' % uuid,
                     })
         with open('feeds/static/opml/%s.opml' % uuid, 'wb') as opml:
             rough_string = ElementTree.tostring(root, 'utf-8')
@@ -238,7 +236,6 @@ def get_verification(request):
     url = reverse('links', kwargs={'uuid': auth_token.uuid})
     # return render_to_response('layout.html')# , context={'uuid': '%s' % job.id})
     return redirect(url)
-
 
 
 def get_status(request):

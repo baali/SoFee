@@ -39,7 +39,7 @@ add them to TwitterAccounts table to be picked up by celery scheduler task.'''
                 last_updated = pytz.utc.localize(statuses[0].created_at)
             else:
                 last_updated = pytz.utc.localize(datetime.datetime.now())
-            twitter_account, created = TwitterAccount.objects.get_or_create(screen_name=friend.screen_name, defaults={'last_updated':last_updated})
+            twitter_account, created = TwitterAccount.objects.get_or_create(screen_name=friend.screen_name, defaults={'last_updated': last_updated})
             if created:
                 twitter_account.save()
                 twitter_account.followed_from.add(auth_token)
@@ -62,16 +62,15 @@ add them to TwitterAccounts table to be picked up by celery scheduler task.'''
                     followed_from=auth_token,
                     status_text=text,
                     status_url=url)
-                status_obj.status_created=tweeted_at
+                status_obj.status_created = tweeted_at
                 status_obj.save()
 
                 if tweet._json['entities'].get('urls', []):
                     for url_entity in tweet._json['entities']['urls']:
                         if url_entity.get('expanded_url', ''):
-                            shared_at = pytz.utc.localize(tweet.created_at)
                             link_obj, created = UrlShared.objects.get_or_create(
                                 url=url_entity['expanded_url'],
-                                defaults={'url_shared':pytz.utc.localize(tweet.created_at)})
+                                defaults={'url_shared': pytz.utc.localize(tweet.created_at)})
                             if created:
                                 link_obj.save()
                             if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():

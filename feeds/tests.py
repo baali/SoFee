@@ -67,9 +67,8 @@ class FeedsTest(TestCase):
                 if tweet._json['entities'].get('urls', []):
                     for url_entity in tweet._json['entities']['urls']:
                         if url_entity.get('expanded_url', ''):
-                            shared_at = pytz.utc.localize(tweet.created_at)
                             link_obj, created = models.UrlShared.objects.get_or_create(
-                                url=url_entity['expanded_url'], defaults={'url_shared':pytz.utc.localize(tweet.created_at)})
+                                url=url_entity['expanded_url'], defaults={'url_shared': pytz.utc.localize(tweet.created_at)})
                             if created:
                                 link_obj.save()
                             if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
@@ -129,7 +128,7 @@ class FeedsTest(TestCase):
         # Do: get random date from record
         random_date = models.UrlShared.objects.all().datetimes('url_shared', 'day').order_by('?').first().strftime('%d %b %Y')
         # When: We pass this date as one of query parameter
-        response = self.client.get(url, data={'feed': '1', 'date':random_date})
+        response = self.client.get(url, data={'feed': '1', 'date': random_date})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
         # Then: date returned in response is same as the one passed as query parameter
@@ -164,8 +163,6 @@ class FeedsTest(TestCase):
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
         url = reverse('links', kwargs={'uuid': auth_token.uuid})
-        # Do: Get a random UUID existing in records
-        random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
         # When: We make request with url to be stored
         response = self.client.post(url, data={'url_shared': 'http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/'}, format='json')
         # Then: we get 201, Created
@@ -208,11 +205,11 @@ works.
         # Do: Get a random UUID existing in records
         random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
         # When: We make request with parameter 'links_of'
-        response = self.client.get(url, data={'links_of':random_existing_uuid})
+        response = self.client.get(url, data={'links_of': random_existing_uuid})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), models.UrlShared.objects.filter(shared_from__uuid=random_existing_uuid).count())
         # When: we use random UUID and query for links
-        response = self.client.get(url, data={'links_of':str(uuid4())})
+        response = self.client.get(url, data={'links_of': str(uuid4())})
         # Then: we get 404, NotFound response
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
