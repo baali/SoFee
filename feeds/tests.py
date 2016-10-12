@@ -9,7 +9,6 @@ from feeds import models
 import datetime
 from rest_framework import status
 from uuid import uuid4
-from rest_framework.test import APIClient
 
 
 class FeedsTest(TestCase):
@@ -40,7 +39,7 @@ class FeedsTest(TestCase):
         friends_counter = 0
         for friend in tweepy.Cursor(cls.api.friends).items():
             if not friend.url:
-                continue            
+                continue
             twitter_account, created = models.TwitterAccount.objects.get_or_create(screen_name=friend.screen_name)
             if created:
                 twitter_account.save()
@@ -55,13 +54,13 @@ class FeedsTest(TestCase):
                     text = twitter_account.screen_name + ' Retweeted ' + tweet.retweeted_status.author.screen_name + ': ' + tweet.retweeted_status.text
                 else:
                     text = tweet.text
-                created = pytz.utc.localize(tweet.created_at)
+                created_at = pytz.utc.localize(tweet.created_at)
                 url = 'https://twitter.com/' + twitter_account.screen_name + '/status/' + tweet.id_str
-                status_obj = models.TwitterStatus.objects.create(
+                status_obj = models.TwitterStatus(
                     tweet_from=twitter_account,
                     followed_from=auth_token,
                     status_text=text,
-                    status_created=created,
+                    status_created=created_at,
                     status_url=url)
                 status_obj.save()
 
@@ -70,15 +69,15 @@ class FeedsTest(TestCase):
                         if url_entity.get('expanded_url', ''):
                             shared_at = pytz.utc.localize(tweet.created_at)
                             link_obj, created = models.UrlShared.objects.get_or_create(
-                                url=url_entity['expanded_url'],
-                                url_shared=shared_at)
+                                url=url_entity['expanded_url'], defaults={'url_shared':pytz.utc.localize(tweet.created_at)})
                             if created:
                                 link_obj.save()
-                            link_obj.shared_from.add(twitter_account)
-                            link_obj.save()
+                            if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
+                                link_obj.shared_from.add(twitter_account)
+                                link_obj.save()
 
             friends_counter += 1
-            if friends_counter >= 2:
+            if friends_counter >= 3:
                 break
 
     @classmethod
@@ -92,7 +91,13 @@ class FeedsTest(TestCase):
         """
         Tests to make sure we get OPML file for an account.
         """
-        pass
+        auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
+        url = reverse('opml', kwargs={'uuid': auth_token.uuid})
+        # When: we pass feed parameter for user
+        response = self.client.get(url)
+        # Then: We are returned XML created from tweets
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(finders.find('opml/%s.opml' % auth_token.uuid))
 
     def test_get_feed_xml(self):
         """
@@ -102,10 +107,33 @@ class FeedsTest(TestCase):
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
         url = reverse('links', kwargs={'uuid': auth_token.uuid})
         # When: we pass feed parameter for user
-        response = self.client.get(url, data={'feed':'1'})
+        response = self.client.get(url, data={'feed': '1'})
         # Then: We are returned XML created from tweets
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(finders.find('xml/%s-feed.xml' %auth_token.uuid))
+        self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
+
+    def test_get_feed_xml_dates(self):
+        """Tests to make sure we are able to query system for feeds of
+        different dates, default being today.
+
+        """
+        auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
+        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        # When: we pass no data parameter, today's feed is returned
+        response = self.client.get(url, data={'feed': '1'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
+        # Then: date returned in response is of today
+        self.assertEqual(response.data['date'], datetime.date.today().strftime('%d %b %Y'))
+
+        # Do: get random date from record
+        random_date = models.UrlShared.objects.all().datetimes('url_shared', 'day').order_by('?').first().strftime('%d %b %Y')
+        # When: We pass this date as one of query parameter
+        response = self.client.get(url, data={'feed': '1', 'date':random_date})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
+        # Then: date returned in response is same as the one passed as query parameter
+        self.assertEqual(response.data['date'], random_date)
 
     def test_xml_content(self):
         """Tweet something using tweepy and making sure tweet gets reflected
@@ -139,7 +167,7 @@ class FeedsTest(TestCase):
         # Do: Get a random UUID existing in records
         random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
         # When: We make request with url to be stored
-        response = self.client.post(url, data={'url_shared':'http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/'}, format='json')
+        response = self.client.post(url, data={'url_shared': 'http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/'}, format='json')
         # Then: we get 201, Created
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         # When: We query for links shared by this user.
@@ -149,7 +177,7 @@ class FeedsTest(TestCase):
         self.assertIn('http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/',
                       [shared_url['url'] for shared_url in response.data])
         # When: We post a url with all query parameters.
-        response = self.client.post(url, data={'url_shared':'http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur'}, format='json')
+        response = self.client.post(url, data={'url_shared': 'http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         response = self.client.get(url)
         # Then: Only base URL without query string should be part of URL sahred
@@ -160,7 +188,7 @@ class FeedsTest(TestCase):
                          [shared_url['url'] for shared_url in response.data])
 
         # When: We post a url with all query parameters.
-        response = self.client.post(url, data={'url_shared':'http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC'}, format='json')
+        response = self.client.post(url, data={'url_shared': 'http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         response = self.client.get(url)
         # Then: Only base URL without query string should be part of URL sahred
@@ -170,7 +198,6 @@ class FeedsTest(TestCase):
         self.assertNotIn('http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC',
                          [shared_url['url'] for shared_url in response.data])
 
-        
     def test_tweet_links_individual(self):
         """Tests to confirm that fetching links shared by single account
 works.
