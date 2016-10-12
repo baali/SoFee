@@ -12,6 +12,12 @@ from rest_framework.response import Response
 from urllib import parse
 from rest_framework.decorators import api_view
 from feedgen.feed import FeedGenerator
+from xml.etree.ElementTree import Element, SubElement, Comment
+from xml.dom import minidom
+from xml.etree import ElementTree
+import datetime
+from django.utils import timezone
+from dateutil import parser
 
 session = {}
 
@@ -98,10 +104,48 @@ class StatusViewSet(viewsets.ModelViewSet):
         uuid = self.kwargs["uuid"]
         seen = self.request.query_params.get("seen", False)
         if TwitterStatus.objects.filter(followed_from__uuid=uuid).exists():
-            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen)
+            # time_threshold = timezone.now() - datetime.timedelta(hours=24)
+            if seen:
+                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid)
+            else:
+                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen)
             return statuses
         else:
             raise Http404
+
+
+@api_view(['GET'])
+def opml(request, uuid):
+    if TwitterAccount.objects.filter(followed_from__uuid=uuid).exists():
+        root = Element('opml')
+        generated_on = str(datetime.datetime.now())
+        root.set('version', '1.0')
+        root.append(Comment('Feed list of all tweets'))
+
+        head = SubElement(root, 'head')
+        title = SubElement(head, 'title')
+        title.text = 'My Twitter Feed'
+        dc = SubElement(head, 'dateCreated')
+        dc.text = generated_on
+        dm = SubElement(head, 'dateModified')
+        dm.text = generated_on
+
+        body = SubElement(root, 'body')
+        host_uri = 'http://' + request.get_host()
+        SubElement(body, 'outline',
+                   {'text': 'Links',
+                    'title': 'Feeds of all links shared by people you follow.',
+                    'type': 'rss',
+                    'htmlUrl': host_uri + 'links/%s/'%uuid,
+                    'xmlUrl': host_uri + 'links/%s/?feed=1'%uuid,
+                    })
+        with open('feeds/static/opml/%s.opml' % uuid, 'wb') as opml:
+            rough_string = ElementTree.tostring(root, 'utf-8')
+            reparsed = minidom.parseString(rough_string)
+            opml.write(reparsed.toprettyxml(indent="  ").encode('utf8'))
+        return Response({'xml_file': 'opml/%s.opml' % uuid}, status=status.HTTP_200_OK)
+    else:
+        raise Http404
 
 
 def timeline(request):
