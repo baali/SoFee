@@ -27,6 +27,7 @@ urlpatterns = [
         name='get_status',
     ),
     url(r'^links/(?P<uuid>[a-zA-Z0-9-]+)/$', views.url_list, name='links'),
+    url(r'^opml/(?P<uuid>[a-zA-Z0-9-]+)/$', views.opml, name='opml'),
     url(r'^status/(?P<uuid>[a-zA-Z0-9-]+)/$', status_list, name='statuses'),
     url(r'^api-auth/(?P<uuid>[a-zA-Z0-9-]+)/', include('rest_framework.urls', namespace='rest_framework'))
 ]
