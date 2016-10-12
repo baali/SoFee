@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.shortcuts import redirect, render_to_response
 from django.http import JsonResponse, Http404
+from django.core.urlresolvers import reverse
 from rest_framework.serializers import ValidationError
 import tweepy
 from feeds.tasks import opml_task
@@ -204,7 +205,7 @@ def get_opml(request):
     try:
         # get the request tokens
         redirect_url = auth.get_authorization_url()
-        session['request_token'] = auth.request_token
+        request.session['request_token'] = auth.request_token
         return redirect(redirect_url)
 
     except tweepy.TweepError as e:
@@ -214,13 +215,30 @@ def get_opml(request):
 def get_verification(request):
     # get the verifier key from the request url
     verifier = request.GET.get('oauth_verifier')
-    if 'request_token' not in session:
+    if 'request_token' not in request.session:
         return redirect('/')
-    token = session['request_token']
-    job = opml_task.apply_async(
-        [token, verifier, 'http://' + request.get_host()])
-    session.pop('request_token')
-    return render_to_response('layout.html', context={'uuid': '%s' % job.id})
+    auth = tweepy.OAuthHandler(
+        settings.TWITTER_CONSUMER_KEY, settings.TWITTER_CONSUMER_SECRET)
+    auth.request_token = request.session['request_token']
+    try:
+        auth.get_access_token(verifier)
+    except tweepy.TweepError:
+        raise
+    try:
+        api = tweepy.API(auth, wait_on_rate_limit=True)
+    except tweepy.TweepError:
+        raise
+    me = api.me()
+    auth_token, created = AuthToken.objects.get_or_create(
+        screen_name=me.screen_name)
+
+    # job = opml_task.apply_async(
+    #     [token, verifier, 'http://' + request.get_host()])
+    request.session.pop('request_token')
+    url = reverse('links', kwargs={'uuid': auth_token.uuid})
+    # return render_to_response('layout.html')# , context={'uuid': '%s' % job.id})
+    return redirect(url)
+
 
 
 def get_status(request):
