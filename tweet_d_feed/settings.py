@@ -130,7 +130,7 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-
+STATIC_ROOT = 'media/static'
 BROKER_URL = 'redis://localhost:6379/0'
 
 STATICFILES_FINDERS = [
