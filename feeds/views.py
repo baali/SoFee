@@ -4,32 +4,28 @@ from django.http import JsonResponse, Http404
 from django.core.urlresolvers import reverse
 from rest_framework.serializers import ValidationError
 import tweepy
-from feeds.tasks import opml_task
+from feeds.tasks import update_accounts_task
 from django.contrib.auth import logout
 from feeds.models import UrlShared, TwitterStatus, TwitterAccount, AuthToken
 from feeds.serializers import UrlSerializer, StatusSerializer
 from rest_framework import viewsets, pagination, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from urllib import parse
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from feedgen.feed import FeedGenerator
 from xml.etree.ElementTree import Element, SubElement, Comment
 from xml.dom import minidom
 from xml.etree import ElementTree
 import datetime
-# from django.utils import timezone
+from django.utils import timezone
 from dateutil import parser
-
-session = {}
-
-
-class CursorPagination(pagination.CursorPagination):
-    page_size = 25
-    page_size_query_param = 'page_size'
-    max_page_size = 1000
+from django.http import QueryDict
+# from django.core.management import call_command
 
 
 @api_view(['GET', 'POST'])
+@permission_classes([AllowAny, ])
 def url_list(request, uuid):
     if request.method == 'GET':
         get_feed = request.query_params.get('feed', None)
@@ -62,15 +58,14 @@ def url_list(request, uuid):
             return Response({'xml_file': 'xml/%s-feed.xml' % uuid, 'date': feed_date.strftime('%d %b %Y')}, status=status.HTTP_200_OK)
         else:
             # To return links shared only in last 24 hours
-            # time_threshold = timezone.now() - datetime.timedelta(hours=24)
-            # url_shared__gte=time_threshold
+            time_threshold = timezone.now() - datetime.timedelta(hours=24)
             if links_of:
                 if TwitterAccount.objects.filter(uuid=links_of):
-                    links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen)
+                    links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen, url_shared__gte=time_threshold)
                 else:
                     raise Http404
             else:
-                links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen)
+                links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen, url_shared__gte=time_threshold)
             serialized_links = UrlSerializer(links, many=True)
             return Response(serialized_links.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
@@ -101,17 +96,17 @@ def url_list(request, uuid):
 class StatusViewSet(viewsets.ModelViewSet):
     lookup_field = 'followed_from__uuid'
     serializer_class = StatusSerializer
-    # pagination_class = CursorPagination
+    pagination_class = pagination.PageNumberPagination
 
     def get_queryset(self):
         uuid = self.kwargs["uuid"]
         seen = self.request.query_params.get("seen", False)
         if TwitterStatus.objects.filter(followed_from__uuid=uuid).exists():
-            # time_threshold = timezone.now() - datetime.timedelta(hours=24)
+            time_threshold = timezone.now() - datetime.timedelta(hours=24)
             if seen:
-                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid)
+                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_created__gte=time_threshold)
             else:
-                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen)
+                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen, status_created__gte=time_threshold)
             return statuses
         else:
             raise Http404
@@ -190,11 +185,11 @@ def check_key(request):
     return True
 
 
-def index(request):
-    return render_to_response('layout.html')
+def index(request, uuid=''):
+    return render_to_response('layout.html', {'uuid': uuid, 'task_id': request.GET.get('task_id', '')})
 
 
-def get_opml(request):
+def oauth_dance(request):
     auth = tweepy.OAuthHandler(
         settings.TWITTER_CONSUMER_KEY,
         settings.TWITTER_CONSUMER_SECRET,
@@ -229,19 +224,24 @@ def get_verification(request):
     me = api.me()
     auth_token, created = AuthToken.objects.get_or_create(
         screen_name=me.screen_name)
+    auth_token.access_token = auth.access_token
+    auth_token.access_token_secret = auth.access_token_secret
+    auth_token.save()
 
-    # job = opml_task.apply_async(
-    #     [token, verifier, 'http://' + request.get_host()])
     request.session.pop('request_token')
-    url = reverse('links', kwargs={'uuid': auth_token.uuid})
+    job = update_accounts_task.apply_async([str(auth_token.uuid)])
+    url = reverse('index', kwargs={'uuid': auth_token.uuid})
+    qdict = QueryDict('', mutable=True)
+    qdict.update({'task_id': job.id})
     # return render_to_response('layout.html')# , context={'uuid': '%s' % job.id})
-    return redirect(url)
+    # call_command('poll_twitter', str(auth_token.uuid))
+    return redirect(url + '?' + qdict.urlencode())
 
 
 def get_status(request):
     # get the verifier key from the request url
-    task_id = request.GET.get('uuid')
-    task = opml_task.AsyncResult(task_id)
+    task_id = request.GET.get('task_id')
+    task = update_accounts_task.AsyncResult(task_id)
     if task.state == 'PROGRESS':
         return JsonResponse({'task_status': task.state, 'info': task.info['info'], 'count': task.info['count'], 'total_count': task.info['total']})
     elif task.state == 'FAILURE':
