@@ -31,11 +31,11 @@ class TwitterStatus(UUIDMixin):
     status_text = models.CharField(max_length=240)
     status_created = models.DateTimeField()
     status_seen = models.BooleanField(default=False)
-    status_url = models.URLField()
+    status_url = models.URLField(unique=True)
     # status_json = JSONField(default={})
 
     class Meta:
-        ordering = ('status_created',)
+        ordering = ('-status_created',)
 
     def __str__(self):
         return self.tweet_from, self.status_text
@@ -48,10 +48,11 @@ class UrlShared(UUIDMixin):
     shared_from = models.ManyToManyField(TwitterAccount)
     url_shared = models.DateTimeField(default=timezone.now)
     url_seen = models.BooleanField(default=False)
+    quoted_text = models.TextField(blank=True)
     # tweet_json = JSONField(default={})
 
     class Meta:
-        ordering = ('url_shared',)
+        ordering = ('-url_shared',)
 
     def __str__(self):
         return self.shared_from, self.url
