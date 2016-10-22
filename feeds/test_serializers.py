@@ -61,7 +61,7 @@ class SerializerTests(TestCase):
             self.assertTrue(serialized_obj.data)
             self.assertEqual(serialized_obj.data['status_text'], text)
             self.assertEqual(serialized_obj.data['status_url'], url)
-            self.assertEqual(serialized_obj.data['tweet_from'], self.friend_account.uuid)
+            self.assertEqual(serialized_obj.data['tweet_from']['screen_name'], self.friend_account.screen_name)
             self.assertEqual(serialized_obj.data['followed_from'], auth_token.uuid)
 
     def test_links_serializer(self):
@@ -80,4 +80,4 @@ class SerializerTests(TestCase):
                 serialized_obj = UrlSerializer(link_obj)
                 self.assertTrue(serialized_obj.data)
                 self.assertEqual(serialized_obj.data['url'], url_entity['expanded_url'])
-                self.assertEqual(serialized_obj.data['shared_from'][0], str(self.friend_account.uuid))
+                self.assertEqual(serialized_obj.data['shared_from'][0]['screen_name'], self.friend_account.screen_name)
