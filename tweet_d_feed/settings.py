@@ -140,8 +140,8 @@ STATICFILES_FINDERS = [
 
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ROUTES = {
-    'feeds.tasks.rss_task': {'queue': 'rss_queue'},
-    'feeds.tasks.opml_task': {'queue': 'default'},
+    'feeds.tasks.update_feed': {'queue': 'feed_queue'},
+    'feeds.tasks.update_accounts_task': {'queue': 'default'},
     'feeds.tasks.update_rss_task': {'queue': 'rss_queue'},
 }
 
@@ -151,7 +151,6 @@ TWITTER_CONSUMER_KEY = get_env('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = get_env('TWITTER_CONSUMER_SECRET')
 
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny'
-    ]
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100,
 }
