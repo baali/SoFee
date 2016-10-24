@@ -132,6 +132,7 @@ def update_accounts_task(self, uuid=''):
                             link_obj.save()
             print('Updated', friend.screen_name, 'Added', count, 'Tweets')
             twitter_account.save()
+        update_feed.apply_async([str(auth_token.uuid)])
     return 'Successfully updated accounts.'
 
 
