@@ -162,7 +162,7 @@ CELERYBEAT_SCHEDULE = {
     # Executes updates every 3 hours
     'update-feeds': {
         'task': 'feeds.tasks.update_accounts_task',
-        'schedule': crontab(minute='*', hour='*/1'),
+        'schedule': crontab(minute='0', hour='*/2'),
     },
 }
 
