@@ -44,29 +44,29 @@
           {% block body %}
           {% endblock %}
           {% if uuid %}
-          <ul class="tab">
-          </ul>
+          <ul class="tab"></ul>
           <div id="lists" class="col">
             <ul class="collection" id="tweets">
             </ul>
           </div>
-        </div>
-      </div>
-      {% else %}
-      <div class="center">
-        <div class="chip">
-          <a href="authenticate/">We will need your twitter account auth to proceed.</a>
-        </div>
-      </div>
-      {% endif %}
-      <footer class="page-footer grey lighten-4">
-        <div class="container">
-          <div class="row">
-            <p>Created with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a><br/>
-              Powered by <a href="">Django</a>, <a href="http://www.tweepy.org/">Tweepy</a>, <a href="http://materializecss.com/helpers.html">MaterializeCSS</a>, JQuery</p>
+          {% else %}
+          <div class="center">
+            <div class="chip">
+              <a href="authenticate/">We will need your twitter account auth to proceed.</a>
+            </div>
           </div>
+          {% endif %}
         </div>
-      </footer>
+      </div>
+    </div>      
+    <footer class="page-footer grey lighten-4">
+      <div class="container">
+        <div class="row">
+          <p>Created with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a><br/>
+            Powered by <a href="">Django</a>, <a href="http://www.tweepy.org/">Tweepy</a>, <a href="http://materializecss.com/helpers.html">MaterializeCSS</a>.</p>
+        </div>
+      </div>
+    </footer>
       <script src="{% static "js/status.js" %}"></script>
       {% if uuid %}
         <script type="text/javascript">
@@ -76,6 +76,6 @@
             get_task_status("{{ uuid }}", "{{ task_id }}");
           {% endif %}
         </script>
-      {% endif %}
+        {% endif %}
   </body>
 </html>
