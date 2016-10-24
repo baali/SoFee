@@ -101,15 +101,14 @@ class StatusViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         uuid = self.kwargs["uuid"]
         seen = self.request.query_params.get("seen", False)
-        if TwitterStatus.objects.filter(followed_from__uuid=uuid).exists():
-            time_threshold = timezone.now() - datetime.timedelta(hours=24)
-            if seen:
-                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_created__gte=time_threshold)
-            else:
-                statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen, status_created__gte=time_threshold)
-            return statuses
-        else:
+        if not AuthToken.objects.filter(uuid=uuid).exists():
             raise Http404
+        time_threshold = timezone.now() - datetime.timedelta(hours=24)
+        if seen:
+            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_created__gte=time_threshold)
+        else:
+            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen, status_created__gte=time_threshold)
+        return statuses
 
 
 @api_view(['GET'])
