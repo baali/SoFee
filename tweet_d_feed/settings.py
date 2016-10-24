@@ -90,12 +90,22 @@ WSGI_APPLICATION = 'tweet_d_feed.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+try:
+    DATABASES = {
+        'default': {
+            'ENGINE': get_env('ENGINE'),
+            'NAME': get_env('DB_NAME'),
+            'USER': get_env('DB_USER'),
+            'PASSWORD':get_env('USER_PASS'),
+        }
     }
-}
+except AssertionError:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators
@@ -145,6 +155,18 @@ CELERY_ROUTES = {
     'feeds.tasks.update_rss_task': {'queue': 'rss_queue'},
 }
 
+from celery.schedules import crontab
+
+CELERY_TIMEZONE = 'Asia/Calcutta'
+CELERY_ENABLE_UTC = True
+CELERYBEAT_SCHEDULE = {
+    # Executes updates every 3 hours
+    'update-feeds': {
+        'task': 'feeds.tasks.update_accounts_task',
+        'schedule': crontab(minute='*/15'# , hour='*/1'
+        ),
+    },
+}
 
 # Twitter settings
 TWITTER_CONSUMER_KEY = get_env('TWITTER_CONSUMER_KEY')
