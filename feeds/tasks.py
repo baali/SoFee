@@ -23,21 +23,24 @@ def update_feed(self, uuid):
     accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
     if not accounts:
         return
-    feed_date = datetime.date.today()
+    time_threshold = timezone.now() - datetime.timedelta(hours=24)
     fg = FeedGenerator()
     fg.id('https://twitter.com/%s' % auth_token.screen_name)
     fg.description('Links shared by people you follow')
     fg.title(auth_token.screen_name)
     fg.author({'name': auth_token.screen_name})
     fg.link(href='https://twitter.com/%s' % auth_token.screen_name, rel='alternate')
-    fg.language('en')
+    # fg.language('en')
     print('Parsing links shared by people followed from', auth_token.screen_name)
-    for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date):
+    # FIXME: Distinct over url field to avoid duplicate entries.
+    for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=time_threshold):
         fe = fg.add_entry()
         fe.id(link.url)
         fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
         fe.title(link.url)
+        # FIXME: How to set "TYPE" of content? Can we set it to HTML body of the URL?
         fe.content(link.quoted_text)
+        fe.published(link.url_shared)
         fe.pubdate(link.url_shared)
     print('Dumping links for', auth_token.screen_name, 'in feed file')
     with open('feeds/static/xml/%s-feed.xml' % auth_token.uuid, 'wb') as feed:
