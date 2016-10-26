@@ -102,9 +102,8 @@ function get_links(uuid) {
         $('#tweets').append(
           $('<li class="collection-item">').append(
             $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
-              $('<a>').attr('href', obj.url).attr('target', '_blank').append(
-                $('<span>').text(obj.url)
-              ))));
+              $('<a>').attr('href', obj.url).attr('target', '_blank').text(obj.url)
+            )));
       });
     })
     .fail(function() {
