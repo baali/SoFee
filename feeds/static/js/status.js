@@ -1,8 +1,5 @@
 $( document ).ready(function(){
   $(".button-collapse").sideNav();  
-  $( "#tweets" ).on( "mouseenter", "li.collection-item", function(e) {
-    console.log(this);
-  });
 })
 
 function sleep (time) {
@@ -27,7 +24,6 @@ function get_task_status(uuid, task_id) {
     });
 }
 
-
 function update_feed(url) {
   if (url === null) {
     return
@@ -41,7 +37,7 @@ function update_feed(url) {
         $('#tweets').append(
           $('<li class="collection-item">').append(
             $('<span>').text(obj.tweet_from['screen_name']+' : '+obj.status_text)
-          ).attr("li-uuid", obj.uuid)
+          )
         );
       });
       var last_li = $('li').last();
@@ -70,7 +66,7 @@ function get_status(uuid) {
         $('#tweets').append(
           $('<li class="collection-item">').append(
             $('<span>').text(obj.tweet_from['screen_name']+' : '+obj.status_text)
-          ).attr("li-uuid", obj.uuid));
+          ));
       });
       var last_li = $('li').last();
       last_li.attr('id', 'last_li');
@@ -101,9 +97,16 @@ function get_links(uuid) {
         });
         $('#tweets').append(
           $('<li class="collection-item">').append(
-            $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
-              $('<a>').attr('href', obj.url).attr('target', '_blank').text(obj.url)
-            )));
+            $('<div>').append(
+              $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
+                $('<a>').attr(
+                  'href', obj.url).attr(
+                    'target', '_blank').append(
+                      // setting text to obj.url makes it dynamic
+                      // length and css tries to accommodate text by
+                      // resizing collection div which makes element
+                      // to go beyond screen width.
+                      $('<i class="tiny material-icons">').text('send'))))));
       });
     })
     .fail(function() {
