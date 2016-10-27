@@ -126,13 +126,13 @@ def update_accounts_task(self, uuid=''):
                     if url_entity.get('expanded_url', ''):
                         link_obj, created = UrlShared.objects.get_or_create(
                             url=url_entity['expanded_url'],
-                            quoted_text=text,
-                            defaults={'url_shared': pytz.utc.localize(status.created_at)})
+                            quoted_text=text)
+                        link.url_seen = pytz.utc.localize(status.created_at)
                         if created:
                             link_obj.save()
                         if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
                             link_obj.shared_from.add(twitter_account)
-                            link_obj.save()
+                        link_obj.save()
             print('Updated', friend.screen_name, 'Added', count, 'Tweets')
             twitter_account.save()
         update_feed.apply_async([str(auth_token.uuid)])
