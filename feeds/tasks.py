@@ -126,7 +126,7 @@ def update_accounts_task(self, uuid=''):
                         link_obj, created = UrlShared.objects.get_or_create(
                             url=url_entity['expanded_url'],
                             quoted_text=text)
-                        link.url_seen = pytz.utc.localize(status.created_at)
+                        link_obj.url_seen = pytz.utc.localize(status.created_at)
                         if created:
                             link_obj.save()
                         if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
