@@ -28,7 +28,6 @@ def update_feed(self, uuid):
     fg.id('https://twitter.com/%s' % auth_token.screen_name)
     fg.description('Links shared by people you follow')
     fg.title(auth_token.screen_name)
-    fg.author({'name': auth_token.screen_name})
     fg.link(href='https://twitter.com/%s' % auth_token.screen_name, rel='alternate')
     # fg.language('en')
     print('Parsing links shared by people followed from', auth_token.screen_name)
