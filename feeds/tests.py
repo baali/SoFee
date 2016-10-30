@@ -36,6 +36,7 @@ class FeedsTest(TestCase):
         last_updated = pytz.utc.localize(datetime.datetime.now() - datetime.timedelta(days=365))
         self_account.last_updated = last_updated
         self_account.save()
+        cls.link_timestamps = []
 
         friends_counter = 0
         for friend in tweepy.Cursor(cls.api.friends).items():
@@ -67,18 +68,26 @@ class FeedsTest(TestCase):
 
                 if tweet._json['entities'].get('urls', []):
                     for url_entity in tweet._json['entities']['urls']:
+                        if url_entity.get('expanded_url', '').startswith('https://twitter.com/i/web/status/'):
+                            continue
+                        time_threshold = timezone.now() - datetime.timedelta(hours=24)
+                        if pytz.utc.localize(tweet.created_at) < time_threshold:
+                            continue
                         if url_entity.get('expanded_url', ''):
-                            link_obj, created = models.UrlShared.objects.get_or_create(
-                                url=url_entity['expanded_url'], defaults={'url_shared': pytz.utc.localize(tweet.created_at)})
+                            link_obj, created = models.UrlShared.objects.get_or_create(url=url_entity['expanded_url'])
                             if created:
                                 link_obj.save()
                             if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
                                 link_obj.shared_from.add(twitter_account)
-                                link_obj.save()
-
-            friends_counter += 1
-            if friends_counter >= 3:
+                            link_obj.url_shared = pytz.utc.localize(tweet.created_at)
+                            link_obj.save()
+                            cls.link_timestamps.append((link_obj.uuid, pytz.utc.localize(tweet.created_at)))
+            if models.UrlShared.objects.count() >= 10:
+                cls.link_count = models.UrlShared.objects.count()
                 break
+            friends_counter += 1
+            # if friends_counter >= 3:
+            #     break
 
     @classmethod
     def tearDownClass(cls):
@@ -236,6 +245,12 @@ works.
         response = self.client.get(url)
         # Then: we get 404, NotFound response
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_link_timestamps(self):
+        """Tests to make sure timestamps getting stored are correct"""
+        for (uuid, timestamp) in self.link_timestamps:
+            link_obj = models.UrlShared.objects.get(uuid=uuid)
+            self.assertEqual(link_obj.url_shared, timestamp)
 
     def test_archived_links(self):
         """Tests to make sure links shared on timeline are getting archived.
