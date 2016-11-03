@@ -1,35 +1,115 @@
-function loop_delay(uuid) {
-  setTimeout(get_status, 2000, uuid)
+$( document ).ready(function(){
+  $(".button-collapse").sideNav();  
+})
+
+function sleep (time) {
+  return new Promise((resolve) => setTimeout(resolve, time));
+}
+
+function get_task_status(uuid, task_id) {
+  $.get("/get_task_status/", {'task_id':task_id})
+    .done( function(data) {
+      if (data['task_status'] === 'PROGRESS') {
+        Materialize.toast(data['info'], 1000);
+        Materialize.toast('Processed '+data['count']+' out of '+data['total_count']+' Accounts you follow.', 1000);
+        // http://stackoverflow.com/a/951057
+        sleep(5000).then(() => {
+          get_task_status(uuid, task_id);
+        });
+      } else if (data['task_status'] === 'SUCCESS') {
+        Materialize.toast(data['info'], 1000);
+      } else {
+        $("#tweets").html("<p>Sorry there was issue while processing your Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
+      }      
+    });
+}
+
+function update_feed(url) {
+  if (url === null) {
+    return
+  }
+  console.log('Updating feed...');
+  $.get(url)
+    .done( function(data) {
+      $('#tweets').empty();
+      next_page = data['next'];
+      $.each(data['results'], function(index, obj) {
+        $('#tweets').append(
+          $('<li class="collection-item">').append(
+            $('<span>').text(obj.tweet_from['screen_name']+' : '+obj.status_text)
+          )
+        );
+      });
+      var last_li = $('li').last();
+      last_li.attr('id', 'last_li');
+      var options = [
+        {selector: '#last_li', offset: 190, callback: function(el) {
+          // Materialize.toast("This is our ScrollFire Demo!", 1500 );
+          update_feed(next_page);
+        } },
+      ]
+      Materialize.scrollFire(options);
+    })
 }
 
 function get_status(uuid) {
   if (uuid === undefined) {
     return
   }
-  console.log(uuid);
   var return_status = '';
-  $.get("/get_status/", {"uuid":uuid})
+  var next_page = '';
+  $.get("/status/"+uuid+"/")
     .done( function(data) {
-      if (data.task_status === 'PENDING') {
-        $("div.link").text("");
-        $("span.stats").html("<p>Waiting for task to start...<br /></p>");
-        console.log(data);
-        get_status(uuid);
-      }
-      else if (data.task_status === 'PROGRESS') {
-        $("div.link").text("");
-        $("span.stats").html("Finished " + data.count + "/" + data.total_count +" friends.");
-        $("span.list").html(data.info);
-        get_status(uuid);
-      }
-      else if (data.task_status === 'SUCCESS') {
-        $("div.link").text("");
-        $("span.stats").html("<p>Done processing your OPML file, We have DMed you details or you can Download the file from <a href=\""+data.info+"\">here</a>.<br/></p>");
-      }
+      $('#tweets').empty();
+      next_page = data['next'];
+      $.each(data['results'], function(index, obj) {
+        $('#tweets').append(
+          $('<li class="collection-item">').append(
+            $('<span>').text(obj.tweet_from['screen_name']+' : '+obj.status_text)
+          ));
+      });
+      var last_li = $('li').last();
+      last_li.attr('id', 'last_li');
+      var options = [
+        {selector: '#last_li', offset: 190, callback: function(el) {
+          // Materialize.toast("This is our ScrollFire Demo!", 1500 );
+          update_feed(next_page);
+        } },
+      ]
+      Materialize.scrollFire(options);
     })
     .fail(function() {
-      $("span.stats").html("<p>Sorry for the trouble, We were not able to process your request, please contact baali@muse-amuse.in for clarifications.<br/></p>");
-      console.log( "Task failed" );
+      $("#tweets").html("<p>Sorry we don't have records for this Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
     });
 }
 
+function get_links(uuid) {
+  if (uuid === undefined) {
+    return
+  }
+  $.get("/links/"+uuid+"/")
+    .done( function(data) {
+      $('#tweets').empty();
+      $.each(data, function(index, obj) {
+        var shared_from=""
+        $.each(obj.shared_from, function(index_names, name) {
+          shared_from += name.screen_name+' ';
+        });
+        $('#tweets').append(
+          $('<li class="collection-item">').append(
+            $('<div>').append(
+              $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
+                $('<a>').attr(
+                  'href', obj.url).attr(
+                    'target', '_blank').append(
+                      // setting text to obj.url makes it dynamic
+                      // length and css tries to accommodate text by
+                      // resizing collection div which makes element
+                      // to go beyond screen width.
+                      $('<i class="tiny material-icons">').text('send'))))));
+      });
+    })
+    .fail(function() {
+      $("#tweets").html("<p>Sorry we don't have records for this Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
+    });
+}

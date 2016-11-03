@@ -1,117 +1,141 @@
 import datetime
-import time
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, Comment
 from xml.dom import minidom
-
 from django.conf import settings
 from django.contrib.staticfiles.templatetags.staticfiles import static
 from feedgen.feed import FeedGenerator
 import pytz
 import tweepy
-
-from feeds.models import AuthToken, TwitterAccount
+from django.utils import timezone
+from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
 from tweet_d_feed.celery import app
 
 
 @app.task(bind=True)
-def update_rss_task(self):
-    for account in TwitterAccount.objects.all():
+def update_feed(self, uuid):
+    try:
+        auth_token = AuthToken.objects.get(uuid=uuid)
+    except AuthToken.DoesNotExist:
+        print('Account with uuid', uuid, 'DoesNotExist')
+        return
+    print('Updating feed for', auth_token.screen_name)
+    accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
+    if not accounts:
+        return
+    time_threshold = timezone.now() - datetime.timedelta(hours=24)
+    fg = FeedGenerator()
+    fg.id('https://twitter.com/%s' % auth_token.screen_name)
+    fg.description('Links shared by people you follow')
+    fg.title(auth_token.screen_name)
+    fg.link(href='https://twitter.com/%s' % auth_token.screen_name, rel='alternate')
+    # fg.language('en')
+    print('Parsing links shared by people followed from', auth_token.screen_name)
+    # FIXME: Distinct over url field to avoid duplicate entries.
+    for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=time_threshold):
+        fe = fg.add_entry()
+        fe.id(link.url)
+        fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
+        fe.title(link.url)
+        # FIXME: How to set "TYPE" of content? Can we set it to HTML body of the URL?
+        fe.content(link.quoted_text)
+        fe.published(link.url_shared)
+        fe.pubdate(link.url_shared)
+    print('Dumping links for', auth_token.screen_name, 'in feed file')
+    with open('feeds/static/xml/%s-feed.xml' % auth_token.uuid, 'wb') as feed:
+        feed.write(fg.atom_str(pretty=True))
+    print('Successfully updated feed for', auth_token.screen_name)
+
+
+@app.task(bind=True)
+def update_accounts_task(self, uuid=''):
+    try:
+        auth_tokens = [AuthToken.objects.get(uuid=uuid)] if uuid else AuthToken.objects.all()
+    except AuthToken.DoesNotExist:
+        return 'Given account(%s) DoesNotExist' % uuid
+    for auth_token in auth_tokens:
         auth = tweepy.OAuthHandler(settings.TWITTER_CONSUMER_KEY,
                                    settings.TWITTER_CONSUMER_SECRET)
-        auth_token = account.followed_from
         auth.set_access_token(auth_token.access_token,
                               auth_token.access_token_secret)
         try:
             api = tweepy.API(auth, wait_on_rate_limit=True)
         except tweepy.TweepError:
             print('Error! Failed to get access token for user %s.' %
-                  account.screen_name)
+                  auth_token.screen_name)
             continue
-        statuses = api.user_timeline(screen_name=account.screen_name)
-        name = friend_url = screen_name = None
-        for status in statuses:
-            if pytz.utc.localize(status.created_at) < account.last_updated:
-                break
-            if status.author.screen_name == account.screen_name:
-                # skipping tweets where someone else is talking to friend
-                name = status.author.name
-                friend_url = status.author.url
-                screen_name = status.author.screen_name
-                break
-        # condition when user has not added anything to the timeline
-        # since we last parsed their timeline
-        if screen_name is None or name is None:
-            continue
-        fg = FeedGenerator()
-        fg.id(friend_url)
-        fg.description('Tweets by ' + name)
-        fg.title(screen_name)
-        fg.author({'name': name})
-        fg.link(href=friend_url, rel='alternate')
-        fg.language('en')
-        # get 10 time line activities for the friend
-        count = 0
-
-        # Check if there were no recent updates in the timeline by the author
-        if not [status for status in statuses if status.author.screen_name == account.screen_name and pytz.utc.localize(status.created_at) > account.last_updated]:
-            continue
-        for status in statuses:
-            if not status.author.screen_name == account.screen_name:
-                # skipping tweets where someone else is talking to friend
+        me = api.me()
+        friend_count = 0
+        for friend in tweepy.Cursor(api.friends).items():
+            friend_count += 1
+            meta = {'info': 'Processing user %s/<a href="https://twitter.com/%s">%s</a>' % (friend.name, friend.screen_name, friend.screen_name),
+                    'count': friend_count,
+                    'total': me.friends_count,
+                    }
+            self.update_state(state='PROGRESS', meta=meta)
+            statuses = api.user_timeline(screen_name=friend.screen_name)
+            if friend.screen_name is None or friend.name is None:
                 continue
-            if pytz.utc.localize(status.created_at) > account.last_updated:
-                account.last_updated = pytz.utc.localize(status.created_at)
-            screen_name = status.author.screen_name
-            if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
-                text = status.retweeted_status.text
-            else:
-                text = status.text
+            try:
+                twitter_account = TwitterAccount.objects.get(screen_name=friend.screen_name)
+                if not twitter_account.followed_from.filter(uuid=auth_token.uuid).exists():
+                    twitter_account.followed_from.add(auth_token)
+            except TwitterAccount.DoesNotExist:
+                twitter_account, created = TwitterAccount.objects.get_or_create(screen_name=friend.screen_name,
+                                                                                defaults={'last_updated': timezone.now() - datetime.timedelta(days=365)})
+                twitter_account.save()
+                twitter_account.followed_from.add(auth_token)
 
-            url = 'https://twitter.com/' + screen_name + '/status/' + status.id_str
-            fe = fg.add_entry()
-            fe.id(url)
-            fe.author({'name': name})
-            fe.title(text)
-            fe.description(text)
-            fe.pubdate(pytz.utc.localize(status.created_at))
-            count += 1
-        account.save()
-        with open('feeds/static/xml/feed-%s.xml' % account.screen_name, 'w') as feed:
-            feed.write(fg.rss_str())
+            # Check if there were no recent updates in the timeline by the author
+            if not [status for status in statuses if status.author.screen_name == friend.screen_name and pytz.utc.localize(status.created_at) > twitter_account.last_updated]:
+                continue
+            count = 0
+            for status in statuses:
+                if not status.author.screen_name == friend.screen_name:
+                    # skipping tweets where someone else is talking to friend
+                    # FIXME: We have to consider case when user 'favourites' a tweet <- They could be treasure trove
+                    continue
+                if pytz.utc.localize(status.created_at) > twitter_account.last_updated:
+                    twitter_account.last_updated = pytz.utc.localize(status.created_at)
+                # FIXME: Should we have a different check to avoid duplicate tweets?
+                url = 'https://twitter.com/' + twitter_account.screen_name + '/status/' + status.id_str
+                count += 1
+                if TwitterStatus.objects.filter(status_url=url).exists():
+                    continue
+                if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
+                    text = status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.text
+                else:
+                    text = status.text
+                tweeted_at = pytz.utc.localize(status.created_at)
+                status_obj = TwitterStatus(
+                    tweet_from=twitter_account,
+                    followed_from=auth_token,
+                    status_text=text,
+                    status_url=url)
+                status_obj.status_created = tweeted_at
+                status_obj.save()
 
-
-@app.task(bind=True)
-def rss_task(self, friend_url, screen_name, name, friend_id, timeline):
-    fg = FeedGenerator()
-    fg.id(friend_url)
-    fg.description('Tweets by ' + name)
-    fg.title(screen_name)
-    fg.author({'name': name})
-    fg.link(href=friend_url, rel='alternate')
-    fg.language('en')
-    # get 10 time line activities for the friend
-    count = 0
-
-    for status in timeline:
-        if not status.author.id_str == friend_id:
-            # skipping tweets where someone else is talking to friend
-            continue
-        if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
-            text = status.retweeted_status.text
-        else:
-            text = status.text
-
-        url = 'https://twitter.com/' + screen_name + '/status/' + status.id_str
-        fe = fg.add_entry()
-        fe.id(url)
-        fe.author({'name': name})
-        fe.title(text)
-        fe.description(text)
-        fe.pubdate(pytz.utc.localize(status.created_at))
-        count += 1
-    with open('feeds/static/xml/feed-%s.xml' % screen_name, 'w') as feed:
-        feed.write(fg.rss_str())
+                # In case of "quoted tweets" the original tweets is part of the url entities
+                # FIXME: I have to handle it better, in case quoted tweet has an external link?
+                # if status.is_quote_status:
+                #     continue
+                for url_entity in status._json['entities']['urls']:
+                    if url_entity.get('expanded_url', '').startswith('https://twitter.com/i/web/status/'):
+                        continue
+                    if url_entity.get('expanded_url', ''):
+                        link_obj, created = UrlShared.objects.get_or_create(
+                            url=url_entity['expanded_url'],
+                            quoted_text=text)
+                        link_obj.url_shared = pytz.utc.localize(status.created_at)
+                        if created:
+                            link_obj.save()
+                        if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
+                            link_obj.shared_from.add(twitter_account)
+                        link_obj.save()
+            print('Updated', friend.screen_name, 'Added', count, 'Tweets')
+            twitter_account.save()
+        update_feed.apply_async([str(auth_token.uuid)])
+    return 'Successfully updated accounts.'
 
 
 @app.task(bind=True)
@@ -177,7 +201,6 @@ def opml_task(self, token, verifier, host_uri):
                 twitter_account.save()
             except:
                 print('Skipping friend %s for now' % friend.screen_name)
-            time.sleep(.5)
     with open('feeds/static/opml/%s.opml' % me.screen_name, 'w') as opml:
         rough_string = ElementTree.tostring(root, 'utf-8')
         reparsed = minidom.parseString(rough_string)

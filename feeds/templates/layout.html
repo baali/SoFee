@@ -1,54 +1,81 @@
-{% load staticfiles %}
+{% load static %}
 <!DOCTYPE html >
 <html lang="en" {%block html_attribs%}{%endblock html_attribs%}>
-  <title>Tweets</title>
+  <title>[SoFee]</title>
   <head>
-    <link rel=stylesheet type=text/css href="{% static "css/style.css" %}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/css/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/js/materialize.min.js"></script>
   </head>
   <body>
-    <div class=page>
-      <h1>Tweets Di Feed</h1>
-      <p> 
-        This simple Application will enable you to get RSS Feeds of
-        tweets of people you follow. <br/ ><br/ >
-
-            Because of rate limiting policies of twitter it takes time to
-            compile the list of people you follow so we will DM you the link
-            to OPML file as and when the process finishes.<br/ ><br/ >
-
-                With respect to APP permissions, to DM you the details we will
-                need highest of them. Otherwise we could had done with minimum
-                permissions to get list of people you follow and their latest
-                tweets.<br/ ><br/ >
-      </p>
-      <div class=link>
-        <p>
+    <nav>
+      <div class="navbar-wrapper">
+        <a href="#" class="brand-logo center">[So]cialMedia-[Fee]d</a>
+        <a href="#" data-activates="mobile-demo" class="button-collapse"><i class="material-icons">menu</i></a>
+        <ul class="right hide-on-med-and-down">
+          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
+          <li><a href="#" onclick="get_links('{{uuid}}')">Links</a></li>
           {% if uuid %}
-            <a href="opml/" id="get-opml">Waiting for the process to start...</a>
-          {% else %}
-            <a href="opml/" id="get-opml">Lets Get Started</a>
+          {% with 'xml/'|add:uuid|add:'-feed.xml' as xml_static %}
+          <li><a href="{% static xml_static %}" target='_blank'><span>Feed</span></a></li>
+          {% endwith %}
           {% endif %}
-        </p>
+        </ul>
+        <ul class="side-nav" id="mobile-demo">
+          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
+          <li><a href="#" onclick="get_links('{{uuid}}')">Links</a></li>
+          {% if uuid %}
+          {% with 'xml/'|add:uuid|add:'-feed.xml' as xml_static %}
+          <li><a href="{% static xml_static %}" target='_blank'><span>Feed</span></a></li>
+          {% endwith %}
+          {% endif %}
+        </ul>
       </div>
-      <div class=status>
-        <p>
-        <span class=stats></span><br/>        
-        <span class=list></span>
-        </p>
+    </nav>
+    <div class="container grey lighten-5">
+      <div class="row">
+        <div class="col">
+          <p>[SoFee] gets tweet of people you follow and list
+          them <i>chronologically</i>. Additionally it provides
+          dedicated feed(Atom)/stream of links/URLs.
+          </p>
+          {% block body %}
+          {% endblock %}
+          {% if uuid %}
+          <ul class="tab"></ul>
+          <div id="lists" class="col">
+            <ul class="collection" id="tweets">
+            </ul>
+          </div>
+          {% else %}
+          <div class="center">
+            <div class="chip">
+              <a href="authenticate/">We will need your twitter account auth to proceed.</a>
+            </div>
+          </div>
+          {% endif %}
+        </div>
       </div>
-      <div class=metanav>
-        Created by <a href="http://mutables.co/" target="_blank">Mutables</a> with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a>
+    </div>      
+    <footer class="page-footer grey lighten-4">
+      <div class="container">
+        <div class="row">
+          <p>Created with significant inputs from <a href="https://twitter.com/punchagan/" target="_blank">@punchagan</a><br/>
+            Powered by <a href="">Django</a>, <a href="http://www.tweepy.org/">Tweepy</a>, <a href="http://materializecss.com/helpers.html">MaterializeCSS</a>.</p>
+        </div>
       </div>
-      {% block body %}
-      {% endblock %}
-    </div>
-    <script src="{% static "js/status.js" %}"></script>
-    {% if uuid %}
-      <script type="text/javascript">
-        var uuid = "{{ uuid }}";
-        loop_delay(uuid);
-      </script>
-    {% endif %}
+    </footer>
+      <script src="{% static "js/status.js" %}"></script>
+      {% if uuid %}
+        <script type="text/javascript">
+          var uuid = "{{ uuid }}";
+          get_status(uuid);
+          {% if task_id %}
+            get_task_status("{{ uuid }}", "{{ task_id }}");
+          {% endif %}
+        </script>
+        {% endif %}
   </body>
 </html>
