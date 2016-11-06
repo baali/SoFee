@@ -9,7 +9,7 @@ import pytz
 import tweepy
 from django.utils import timezone
 from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
-from tweet_d_feed.celery import app
+from sofee.celery import app
 
 
 @app.task(bind=True)
