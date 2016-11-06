@@ -1,5 +1,6 @@
-# Tweet_De_Feed
-Get RSS feed of people you follow on twitter
+# [So]cialmeida [Fee]d
+Get RSS feed of from contacts you follow on different social media
+platforms. At the moment we are working on Twitter.
 
 
 ## Setup dev environment
