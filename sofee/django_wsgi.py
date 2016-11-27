@@ -2,7 +2,7 @@ import os
 import sys
 from django.core.wsgi import get_wsgi_application
 
-APP_NAME = 'tweet_d_feed'
+APP_NAME = 'sofee'
 os.environ['DJANGO_SETTINGS_MODULE'] = APP_NAME + '.settings'
 
 FILE_PATH = os.path.dirname(os.path.realpath(__file__))
