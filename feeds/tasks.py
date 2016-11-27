@@ -70,7 +70,8 @@ def fetch_links(self, link_uuid):
             # link_obj.save()
             parsed_content = json.loads(response.stdout.decode('utf-8'))
             if parsed_content:
-                link_obj.cleaned_text = parsed_content['content']
+                link_obj.cleaned_text = '<h4>' + parsed_content['title'] + '</h4>'\
+                                        + parsed_content['content']
                 link_obj.save()
             else:
                 print('Got nothing from url: %s for %s' % (link_obj.url, response.stdout))
