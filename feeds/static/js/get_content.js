@@ -1,4 +1,5 @@
-var readability = require("readability/index");
+var path = require("path");
+var readability = require(path.join(__dirname, "readability/index"));
 var jsdom = require("jsdom");
 var url = require("url");
 
