@@ -7,9 +7,12 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from feedgen.feed import FeedGenerator
 import pytz
 import tweepy
+from Naked.toolshed.shell import muterun_js
+import json
 from django.utils import timezone
 from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
 from sofee.celery import app
+import requests
 
 
 @app.task(bind=True)
@@ -45,6 +48,34 @@ def update_feed(self, uuid):
     with open('feeds/static/xml/%s-feed.xml' % auth_token.uuid, 'wb') as feed:
         feed.write(fg.atom_str(pretty=True))
     print('Successfully updated feed for', auth_token.screen_name)
+
+
+@app.task(bind=True)
+def fetch_links(self, link_uuid):
+    try:
+        link_obj = UrlShared.objects.get(uuid=link_uuid)
+    except UrlShared.DoesNotExist:
+        return
+
+    if link_obj.url.startswith('https://twitter.com/'):
+        tweet_embedded = requests.get('https://publish.twitter.com/oembed', {'url': link_obj.url})
+        if tweet_embedded.status_code == 200 and tweet_embedded.json():
+            link_obj.cleaned_text = tweet_embedded.json()['html']
+            link_obj.save()
+    else:
+        response = muterun_js('feeds/static/js/get_content.js', link_obj.url)
+        if response.exitcode == 0 and response.stdout:
+            # parsed_content = json.loads(response.stdout.decode('utf-8'))
+            # link_obj.cleaned_text = response.stdout.decode('utf-8')
+            # link_obj.save()
+            parsed_content = json.loads(response.stdout.decode('utf-8'))
+            if parsed_content:
+                link_obj.cleaned_text = parsed_content['content']
+                link_obj.save()
+            else:
+                print('Got nothing from url: %s for %s' % (link_obj.url, response.stdout))
+        else:
+            print('Not able to fetch url: %s for %s' % (link_obj.url, response.stderr))
 
 
 @app.task(bind=True)
