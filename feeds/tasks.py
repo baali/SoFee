@@ -163,6 +163,7 @@ def update_accounts_task(self, uuid=''):
                         if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
                             link_obj.shared_from.add(twitter_account)
                         link_obj.save()
+                    fetch_links.apply_async([link_obj.uuid])
             print('Updated', friend.screen_name, 'Added', count, 'Tweets')
             twitter_account.save()
         update_feed.apply_async([str(auth_token.uuid)])
