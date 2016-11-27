@@ -17,8 +17,8 @@
         <a href="#" class="brand-logo center">[So]cialMedia-[Fee]d</a>
         <a href="#" data-activates="mobile-demo" class="button-collapse"><i class="material-icons">menu</i></a>
         <ul class="right hide-on-med-and-down">
-          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
           <li><a href="#" onclick="get_links('{{uuid}}')">Links</a></li>
+          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
           {% if uuid %}
           {% with 'xml/'|add:uuid|add:'-feed.xml' as xml_static %}
           <li><a href="{% static xml_static %}" target='_blank'><span>Feed</span></a></li>
@@ -26,8 +26,8 @@
           {% endif %}
         </ul>
         <ul class="side-nav" id="mobile-demo">
-          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
           <li><a href="#" onclick="get_links('{{uuid}}')">Links</a></li>
+          <li><a href="#" onclick="get_status('{{uuid}}')">Status-es</a></li>
           {% if uuid %}
           {% with 'xml/'|add:uuid|add:'-feed.xml' as xml_static %}
           <li><a href="{% static xml_static %}" target='_blank'><span>Feed</span></a></li>
@@ -79,7 +79,7 @@
     {% if uuid %}
       <script type="text/javascript">
         var uuid = "{{ uuid }}";
-        get_status(uuid);
+        get_links(uuid);
         {% if task_id %}
           get_task_status("{{ uuid }}", "{{ task_id }}");
         {% endif %}
