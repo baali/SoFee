@@ -49,6 +49,7 @@ class UrlShared(UUIDMixin):
     url_shared = models.DateTimeField(default=timezone.now)
     url_seen = models.BooleanField(default=False)
     quoted_text = models.TextField(blank=True)
+    cleaned_text = models.TextField(blank=True)
     # tweet_json = JSONField(default={})
 
     class Meta:
