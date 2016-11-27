@@ -6,3 +6,4 @@ pytz==2016.6.1
 redis==2.10.5
 feedgen==0.3.2
 djangorestframework==3.4.7
+Naked==0.1.31
