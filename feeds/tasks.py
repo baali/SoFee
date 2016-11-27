@@ -40,8 +40,8 @@ def update_feed(self, uuid):
         fe.id(link.url)
         fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
         fe.title(link.url)
-        # FIXME: How to set "TYPE" of content? Can we set it to HTML body of the URL?
-        fe.content(link.quoted_text)
+        fe.content('Quote: ' + link.quoted_text + '<br/>' + link.cleaned_text,
+                   type='html')
         fe.published(link.url_shared)
         fe.pubdate(link.url_shared)
     print('Dumping links for', auth_token.screen_name, 'in feed file')
