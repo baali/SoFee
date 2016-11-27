@@ -1,13 +1,15 @@
 {% load static %}
 <!DOCTYPE html >
 <html lang="en" {%block html_attribs%}{%endblock html_attribs%}>
-  <title>[SoFee]</title>
   <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/css/materialize.min.css">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="description" content="SoFee - SocialMedia Feed Aggregation service.">
+    <title>[SoFee]</title>
+    <link href="{% static "css/ghpages-materialize.css" %}" type="text/css" rel="stylesheet" media="screen,projection">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.1.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.7/js/materialize.min.js"></script>
   </head>
   <body>
     <nav>
@@ -38,8 +40,8 @@
       <div class="row">
         <div class="col">
           <p>[SoFee] gets tweet of people you follow and list
-          them <i>chronologically</i>. Additionally it provides
-          dedicated feed(Atom)/stream of links/URLs.
+            them <i>chronologically</i>. Additionally it provides
+            dedicated feed(Atom)/stream of links/URLs.
           </p>
           {% block body %}
           {% endblock %}
@@ -58,7 +60,11 @@
           {% endif %}
         </div>
       </div>
-    </div>      
+    </div>
+    <div id="cleaned_text" class="modal bottom-sheet">
+      <div class="modal-content">
+      </div>
+    </div>
     <footer class="page-footer grey lighten-4">
       <div class="container">
         <div class="row">
@@ -67,15 +73,17 @@
         </div>
       </div>
     </footer>
-      <script src="{% static "js/status.js" %}"></script>
-      {% if uuid %}
-        <script type="text/javascript">
-          var uuid = "{{ uuid }}";
-          get_status(uuid);
-          {% if task_id %}
-            get_task_status("{{ uuid }}", "{{ task_id }}");
-          {% endif %}
-        </script>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="{% static "js/materialize.js" %}"></script>
+    <script type="text/javascript" src="{% static "js/status.js" %}"></script>
+    {% if uuid %}
+      <script type="text/javascript">
+        var uuid = "{{ uuid }}";
+        get_status(uuid);
+        {% if task_id %}
+          get_task_status("{{ uuid }}", "{{ task_id }}");
         {% endif %}
+      </script>
+    {% endif %}
   </body>
 </html>
