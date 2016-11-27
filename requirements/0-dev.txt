@@ -7,3 +7,4 @@ redis==2.10.5
 feedgen==0.3.2
 djangorestframework==3.4.7
 Naked==0.1.31
+requests==2.11.1
