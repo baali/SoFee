@@ -1,5 +1,18 @@
+var link_details = {}
 $( document ).ready(function(){
-  $(".button-collapse").sideNav();  
+  $(".button-collapse").sideNav();
+  $('.modal').modal();
+  $( "#tweets" ).on( "click", "li.collection-item", function(e) {
+    $('#cleaned_text .modal-content').empty();
+    if ($(this).attr('li-uuid') !== undefined) {
+      console.log($(this).attr('li-uuid'));
+      var content = link_details[$(this).attr('li-uuid')];
+      if (content.trim() !== "") {
+        $('#cleaned_text .modal-content').html(content);
+        $('#cleaned_text').modal('open');
+       }
+    }
+  });
 })
 
 function sleep (time) {
@@ -90,23 +103,25 @@ function get_links(uuid) {
   $.get("/links/"+uuid+"/")
     .done( function(data) {
       $('#tweets').empty();
+      link_details = {};
       $.each(data, function(index, obj) {
         var shared_from=""
         $.each(obj.shared_from, function(index_names, name) {
           shared_from += name.screen_name+' ';
         });
+        link_details[obj.uuid] = obj.cleaned_text;
         $('#tweets').append(
           $('<li class="collection-item">').append(
             $('<div>').append(
               $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
-                $('<a>').attr(
-                  'href', obj.url).attr(
-                    'target', '_blank').append(
-                      // setting text to obj.url makes it dynamic
-                      // length and css tries to accommodate text by
-                      // resizing collection div which makes element
-                      // to go beyond screen width.
-                      $('<i class="tiny material-icons">').text('send'))))));
+                $('<a>').attr('href', obj.url).attr(
+                  'target', '_blank').append(
+                    // setting text to obj.url makes it dynamic
+                    // length and css tries to accommodate text by
+                    // resizing collection div which makes element
+                    // to go beyond screen width.
+                    $('<i class="tiny material-icons">').text('send'))))).attr(
+                      'li-uuid', obj.uuid));
       });
     })
     .fail(function() {
