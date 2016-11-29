@@ -118,6 +118,12 @@ def update_accounts_task(self, uuid=''):
                 twitter_account.save()
                 twitter_account.followed_from.add(auth_token)
 
+            if TwitterStatus.objects.filter(tweet_from=twitter_account).exists():
+                recent_status = TwitterStatus.objects.filter(tweet_from=twitter_account).first()
+                status_id = path.split(recent_status.status_url)[-1]
+                statuses = api.user_timeline(screen_name=friend.screen_name, since_id=status_id)
+            else:
+                statuses = api.user_timeline(screen_name=friend.screen_name)
             # Check if there were no recent updates in the timeline by the author
             if not [status for status in statuses if status.author.screen_name == friend.screen_name and pytz.utc.localize(status.created_at) > twitter_account.last_updated]:
                 continue
