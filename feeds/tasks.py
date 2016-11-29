@@ -1,3 +1,4 @@
+from os import path
 import datetime
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, Comment
@@ -105,7 +106,6 @@ def update_accounts_task(self, uuid=''):
                     'total': me.friends_count,
                     }
             self.update_state(state='PROGRESS', meta=meta)
-            statuses = api.user_timeline(screen_name=friend.screen_name)
             if friend.screen_name is None or friend.name is None:
                 continue
             try:
