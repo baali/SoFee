@@ -15,6 +15,20 @@ from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
 from sofee.celery import app
 import requests
 
+def valid_xml_char_ordinal(c):
+    '''function to avoid control characters from the cleaned_text taken
+    from SO:
+    http://stackoverflow.com/questions/8733233/filtering-out-certain-bytes-in-python
+
+    '''
+    codepoint = ord(c)
+    # conditions ordered by presumed frequency
+    return (
+        0x20 <= codepoint <= 0xD7FF or
+        codepoint in (0x9, 0xA, 0xD) or
+        0xE000 <= codepoint <= 0xFFFD or
+        0x10000 <= codepoint <= 0x10FFFF
+        )
 
 @app.task(bind=True)
 def update_feed(self, uuid):
@@ -41,7 +55,10 @@ def update_feed(self, uuid):
         fe.id(link.url)
         fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
         fe.title(link.url)
-        fe.content('Quote: ' + link.quoted_text + '<br/>' + link.cleaned_text,
+        cleaned_string = 'Quote: ' + ''.join(c for c in link.quoted_text if valid_xml_char_ordinal(c)) + \
+                         '<br/>' + \
+                         ''.join(c for c in link.cleaned_text if valid_xml_char_ordinal(c))
+        fe.content(cleaned_string,
                    type='html')
         fe.published(link.url_shared)
         fe.pubdate(link.url_shared)
