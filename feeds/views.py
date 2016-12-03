@@ -46,7 +46,7 @@ def url_list(request, uuid):
             fg.author({'name': screen_name})
             fg.link(href='https://twitter.com/%s' % screen_name, rel='alternate')
             fg.language('en')
-            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date):
+            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date).order_by('url').distinct('url'):
                 fe = fg.add_entry()
                 fe.id(link.url)
                 fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
@@ -66,7 +66,7 @@ def url_list(request, uuid):
                     raise Http404
             else:
                 links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen, url_shared__gte=time_threshold)
-            serialized_links = UrlSerializer(links, many=True)
+            serialized_links = UrlSerializer(links.order_by('url').distinct('url'), many=True)
             return Response(serialized_links.data, status=status.HTTP_200_OK)
     elif request.method == 'POST':
         url_shared = request.data.get('url_shared', '')
