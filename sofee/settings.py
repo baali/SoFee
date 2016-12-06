@@ -98,6 +98,8 @@ try:
             'NAME': get_env('DB_NAME'),
             'USER': get_env('DB_USER'),
             'PASSWORD': get_env('USER_PASS'),
+            'HOST': get_env('DB_HOST'),
+            'PORT': get_env('DB_PORT'),
         }
     }
 except AssertionError:
