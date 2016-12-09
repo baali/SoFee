@@ -14,6 +14,7 @@ from django.utils import timezone
 from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
 from sofee.celery import app
 import requests
+from urllib import parse
 
 def valid_xml_char_ordinal(c):
     '''function to avoid control characters from the cleaned_text taken
@@ -178,6 +179,14 @@ def update_accounts_task(self, uuid=''):
                     if url_entity.get('expanded_url', '').startswith('https://twitter.com/i/web/status/'):
                         continue
                     if url_entity.get('expanded_url', ''):
+                        if len(url_entity['expanded_url']) > 200:
+                            parsed_url = parse.urlparse(url_entity['expanded_url'])
+                            url_entity['expanded_url'] = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
+                        # If after cleaning parameters len is still
+                        # beyond 200 chars we skip it. Django URLField
+                        # has limit.
+                        if len(url_entity['expanded_url']) > 200:
+                            continue
                         link_obj, created = UrlShared.objects.get_or_create(
                             url=url_entity['expanded_url'],
                             quoted_text=text)
