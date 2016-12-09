@@ -69,7 +69,7 @@ def update_feed(self, uuid):
     print('Successfully updated feed for', auth_token.screen_name)
 
 
-@app.task(bind=True)
+@app.task(bind=True, time_limit=10)
 def fetch_links(self, link_uuid):
     try:
         link_obj = UrlShared.objects.get(uuid=link_uuid)
