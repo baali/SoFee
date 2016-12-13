@@ -9,8 +9,8 @@ $( document ).ready(function(){
       var content = link_details[$(this).attr('li-uuid')];
       if (content.trim() !== "") {
         $('#cleaned_text .modal-content').html(content);
-        $('#cleaned_text').scrollTop(0);
         $('#cleaned_text').modal('open');
+        $('#cleaned_text').scrollTop(0);
        }
     }
   });
