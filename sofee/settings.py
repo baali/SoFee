@@ -93,7 +93,7 @@ WSGI_APPLICATION = 'sofee.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('ENGINE') or 'django.db.backends.postgresql_psycopg2', 
+        'ENGINE': os.getenv('ENGINE') or 'django.db.backends.postgresql_psycopg2',
         'NAME': os.getenv('DB_NAME') or 'travis_ci',
         'USER': os.getenv('DB_USER') or 'postgres',
         'PASSWORD': os.getenv('USER_PASS') or '',
