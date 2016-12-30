@@ -91,24 +91,16 @@ WSGI_APPLICATION = 'sofee.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.9/ref/settings/#databases
 
-try:
-    DATABASES = {
-        'default': {
-            'ENGINE': get_env('ENGINE'),
-            'NAME': get_env('DB_NAME'),
-            'USER': get_env('DB_USER'),
-            'PASSWORD': get_env('USER_PASS'),
-            'HOST': get_env('DB_HOST'),
-            'PORT': get_env('DB_PORT'),
-        }
+DATABASES = {
+    'default': {
+        'ENGINE': get_env('ENGINE'),
+        'NAME': os.getenv('DB_NAME') or 'travis_ci',
+        'USER': os.getenv('DB_USER') or 'postgres',
+        'PASSWORD': os.getenv('USER_PASS') or '',
+        'HOST': os.getenv('DB_HOST') or '127.0.0.1',
+        'PORT': os.getenv('DB_PORT') or 5432,
     }
-except AssertionError:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-        }
-    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators
