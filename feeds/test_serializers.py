@@ -70,6 +70,8 @@ class SerializerTests(TestCase):
             for url_entity in status._json['entities'].get('urls', []):
                 if not url_entity.get('expanded_url', ''):
                     continue
+                if len(url_entity['expanded_url']) > 200:
+                    continue
                 shared_at = pytz.utc.localize(status.created_at)
                 link_obj, created = UrlShared.objects.get_or_create(
                     url=url_entity['expanded_url'], defaults={'url_shared': shared_at})
