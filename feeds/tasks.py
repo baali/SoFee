@@ -16,6 +16,7 @@ from sofee.celery import app
 import requests
 from urllib import parse
 
+
 def valid_xml_char_ordinal(c):
     '''function to avoid control characters from the cleaned_text taken
     from SO:
@@ -29,7 +30,8 @@ def valid_xml_char_ordinal(c):
         codepoint in (0x9, 0xA, 0xD) or
         0xE000 <= codepoint <= 0xFFFD or
         0x10000 <= codepoint <= 0x10FFFF
-        )
+    )
+
 
 @app.task(bind=True)
 def update_feed(self, uuid):
