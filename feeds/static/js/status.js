@@ -106,7 +106,7 @@ function get_links(uuid) {
       $('#tweets').empty();
       link_details = {};
       $.each(data, function(index, obj) {
-        var shared_from=""
+        var shared_from = "";
         $.each(obj.shared_from, function(index_names, name) {
           shared_from += name.screen_name+' ';
         });
