@@ -70,6 +70,7 @@ function get_status(uuid) {
   if (uuid === undefined) {
     return
   }
+  $('.button-collapse').sideNav('hide');
   var return_status = '';
   var next_page = '';
   $.get("/status/"+uuid+"/")
@@ -101,6 +102,7 @@ function get_links(uuid) {
   if (uuid === undefined) {
     return
   }
+  $('.button-collapse').sideNav('hide');
   $.get("/links/"+uuid+"/")
     .done( function(data) {
       $('#tweets').empty();
