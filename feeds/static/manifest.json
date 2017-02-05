@@ -1,0 +1,7 @@
+{
+  "name": "[So]cialMedia [Fee]d",  
+  "short_name": "SoFee",
+  "display": "standalone",
+  "gcm_sender_id": "103953800507",
+  "permissions": ["fcm"]
+}
