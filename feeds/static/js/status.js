@@ -60,7 +60,7 @@ function update_feed(url) {
         {selector: '#last_li', offset: 190, callback: function(el) {
           // Materialize.toast("This is our ScrollFire Demo!", 1500 );
           update_feed(next_page);
-        } },
+        }},
       ]
       Materialize.scrollFire(options);
     })
@@ -103,20 +103,34 @@ function get_links(uuid) {
     return
   }
   $('.button-collapse').sideNav('hide');
-  $.get("/links/"+uuid+"/")
-    .done( function(data) {
-      $('#tweets').empty();
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.onmessage = function(event) {
+      console.log('Service worker returned a message!');
       link_details = {};
-      $.each(data, function(index, obj) {
+      $.each(event.data.results, function(index, obj) {
         var shared_from = "";
         $.each(obj.shared_from, function(index_names, name) {
-          shared_from += name.screen_name+' ';
+          if ('profile_image_url' in name.account_json) {
+            shared_from =
+              $('<div class="chip">').append(
+                $('<a>').attr('href', name.account_json.url).append(
+                  $('<img class="circle responsive-img">').attr('src', name.account_json.profile_image_url)).attr(
+                    'target', '_blank').append(name.account_json.screen_name));
+          }
+          else {
+            shared_from += name.screen_name+' ';
+          }
         });
         link_details[obj.uuid] = obj.cleaned_text;
+        var quoted_text = '';
+        quoted_text = obj.quoted_text;
+        if ('title' in obj.url_json && obj.url_json.title.length > 0) {
+          quoted_text += '<br/><strong>Title</strong>: '+obj.url_json.title;
+        }
         $('#tweets').append(
           $('<li class="collection-item">').append(
-            $('<div>').append(
-              $('<span>').text(shared_from+': '+obj.quoted_text+' ').append(
+            $('<div>').append(shared_from).append(
+              $('<span>').append(quoted_text+' ').append(
                 $('<a>').attr('href', obj.url).attr(
                   'target', '_blank').append(
                     // setting text to obj.url makes it dynamic
@@ -126,8 +140,54 @@ function get_links(uuid) {
                     $('<i class="tiny material-icons">').text('send'))))).attr(
                       'li-uuid', obj.uuid));
       });
-    })
-    .fail(function() {
-      $("#tweets").html("<p>Sorry we don't have records for this Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
-    });
+    }
+    // Create a Message Channel
+    var msg_chan = new MessageChannel();
+    navigator.serviceWorker.controller.postMessage({'uuid': uuid,
+                                                    'action': 'get_links'});
+  }
+  else {
+    console.log('Making our own JS Request!');
+    $.get("/urls/"+uuid+"/")
+      .done( function(data) {
+        $('#tweets').empty();
+        link_details = {};
+        $.each(data.results, function(index, obj) {
+          var shared_from = "";
+          $.each(obj.shared_from, function(index_names, name) {
+            if ('profile_image_url' in name.account_json) {
+              shared_from =
+                $('<div class="chip">').append(
+                  $('<a>').attr('href', name.account_json.url).append(
+                    $('<img class="circle responsive-img">').attr('src', name.account_json.profile_image_url)).attr(
+                      'target', '_blank').append(name.account_json.screen_name));
+            }
+            else {
+              shared_from += name.screen_name+' ';
+            }
+          });
+          link_details[obj.uuid] = obj.cleaned_text;
+          var quoted_text = '';
+          quoted_text = obj.quoted_text;
+          if ('title' in obj.url_json && obj.url_json.title.length > 0) {
+            quoted_text += '<br/><strong>Title</strong>: '+obj.url_json.title;
+          }
+          $('#tweets').append(
+            $('<li class="collection-item">').append(
+              $('<div>').append(shared_from).append(
+                $('<span>').append(quoted_text+' ').append(
+                  $('<a>').attr('href', obj.url).attr(
+                    'target', '_blank').append(
+                      // setting text to obj.url makes it dynamic
+                      // length and css tries to accommodate text by
+                      // resizing collection div which makes element
+                      // to go beyond screen width.
+                      $('<i class="tiny material-icons">').text('send'))))).attr(
+                        'li-uuid', obj.uuid));
+        });
+      })
+      .fail(function() {
+        $("#tweets").html("<p>Sorry we don't have records for this Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
+      });
+  }
 }
