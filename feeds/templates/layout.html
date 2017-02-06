@@ -8,6 +8,7 @@
     <meta name="msapplication-tap-highlight" content="no">
     <meta name="description" content="SoFee - SocialMedia Feed Aggregation service.">
     <title>[SoFee]</title>
+    <link rel="manifest" href="{% static "manifest.json" %}">
     <link href="{% static "css/ghpages-materialize.css" %}" type="text/css" rel="stylesheet" media="screen,projection">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   </head>
@@ -73,12 +74,29 @@
         </div>
       </div>
     </footer>
-    <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="{% static "js/jquery-2.1.1.min.js" %}"></script>
     <script type="text/javascript" src="{% static "js/materialize.js" %}"></script>
+    <script>
+      const uuid = "{{ uuid }}";
+      if (navigator.serviceWorker) {
+        if (navigator.serviceWorker.controller) {
+          console.log('Service worker is already installed');
+        }
+        else {
+          console.log('Service Worker is supported');
+          navigator.serviceWorker.register(src="../../sw.js?uuid={{ uuid }}").then(function(reg) {
+            reg.pushManager.subscribe({
+              userVisibleOnly: true,
+            });
+          }).catch(function(error) {
+            console.log(':^(', error);
+          });
+        }
+      }
+    </script>
     <script type="text/javascript" src="{% static "js/status.js" %}"></script>
     {% if uuid %}
       <script type="text/javascript">
-        var uuid = "{{ uuid }}";
         get_links(uuid);
         {% if task_id %}
           get_task_status("{{ uuid }}", "{{ task_id }}");
