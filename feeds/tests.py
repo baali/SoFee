@@ -74,12 +74,12 @@ class FeedsTest(TestCase):
                         if pytz.utc.localize(tweet.created_at) < time_threshold:
                             continue
                         if url_entity.get('expanded_url', ''):
-                            link_obj, created = models.UrlShared.objects.get_or_create(url=url_entity['expanded_url'])
+                            link_obj, created = models.UrlShared.objects.get_or_create(url=url_entity['expanded_url'],
+                                                                                       url_shared=pytz.utc.localize(tweet.created_at))
                             if created:
                                 link_obj.save()
                             if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
                                 link_obj.shared_from.add(twitter_account)
-                            link_obj.url_shared = pytz.utc.localize(tweet.created_at)
                             link_obj.save()
                             cls.link_timestamps.append((link_obj.uuid, pytz.utc.localize(tweet.created_at)))
             if models.UrlShared.objects.count() >= 10:
@@ -114,9 +114,10 @@ class FeedsTest(TestCase):
         Enabling this for just Links at the moment.
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
-        url = reverse('links', kwargs={'uuid': auth_token.uuid})
-        # When: we pass feed parameter for user
-        response = self.client.get(url, data={'feed': '1'})
+        url = reverse('urls', kwargs={'uuid': auth_token.uuid})
+        url += 'get_feed/'
+        # When: we get_feed for this uuid
+        response = self.client.get(url)
         # Then: We are returned XML created from tweets
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
@@ -127,9 +128,10 @@ class FeedsTest(TestCase):
 
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
-        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        url = reverse('urls', kwargs={'uuid': auth_token.uuid})
+        url += 'get_feed/'
         # When: we pass no data parameter, today's feed is returned
-        response = self.client.get(url, data={'feed': '1'})
+        response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
         # Then: date returned in response is of today
@@ -138,7 +140,7 @@ class FeedsTest(TestCase):
         # Do: get random date from record
         random_date = models.UrlShared.objects.all().datetimes('url_shared', 'day').order_by('?').first().strftime('%d %b %Y')
         # When: We pass this date as one of query parameter
-        response = self.client.get(url, data={'feed': '1', 'date': random_date})
+        response = self.client.get(url, data={'date': random_date})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(finders.find('xml/%s-feed.xml' % auth_token.uuid))
         # Then: date returned in response is same as the one passed as query parameter
@@ -157,54 +159,56 @@ class FeedsTest(TestCase):
 
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
-        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        url = reverse('urls', kwargs={'uuid': auth_token.uuid})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         time_threshold = timezone.now() - datetime.timedelta(hours=24)
-        self.assertEqual(len(response.data), models.UrlShared.objects.filter(url_shared__gte=time_threshold).count())
+        self.assertEqual(len(response.data['results']), models.UrlShared.objects.filter(url_shared__gte=time_threshold).count())
         # When: we use random UUID and query for links
-        url = reverse('links', kwargs={'uuid': str(uuid4())})
+        url = reverse('urls', kwargs={'uuid': str(uuid4())})
         response = self.client.get(url)
         # Then: we get 404, NotFound response
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_tweet_links_post(self):
-        """Tests to post link and store it.
+        """Tests to share link and store it.
 
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
-        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        url = reverse('urls', kwargs={'uuid': auth_token.uuid})
+        url += 'share_url/'
         # When: We make request with url to be stored
         response = self.client.post(url, data={'url_shared': 'http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/'}, format='json')
         # Then: we get 201, Created
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         # When: We query for links shared by this user.
-        response = self.client.get(url)
+        get_url = reverse('urls', kwargs={'uuid': auth_token.uuid})
+        response = self.client.get(get_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Then: The url we just posted should also be returned in list
         self.assertIn('http://journal.burningman.org/2016/10/philosophical-center/tenprinciples/a-brief-history-of-who-ruined-burning-man/',
-                      [shared_url['url'] for shared_url in response.data])
+                      [shared_url['url'] for shared_url in response.data['results']])
         # When: We post a url with all query parameters.
         response = self.client.post(url, data={'url_shared': 'http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        response = self.client.get(url)
+        response = self.client.get(get_url)
         # Then: Only base URL without query string should be part of URL sahred
         self.assertIn('http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html',
-                      [shared_url['url'] for shared_url in response.data])
+                      [shared_url['url'] for shared_url in response.data['results']])
         # Then: Also make sure that url with query-params is not there.
         self.assertNotIn('http://www.nytimes.com/2016/09/03/your-money/caregivers-alzheimers-burnout.html?smid=tw-nythealth&smtyp=cur',
-                         [shared_url['url'] for shared_url in response.data])
+                         [shared_url['url'] for shared_url in response.data['results']])
 
         # When: We post a url with all query parameters.
         response = self.client.post(url, data={'url_shared': 'http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC'}, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        response = self.client.get(url)
+        response = self.client.get(get_url)
         # Then: Only base URL without query string should be part of URL sahred
         self.assertIn('http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339',
-                      [shared_url['url'] for shared_url in response.data])
+                      [shared_url['url'] for shared_url in response.data['results']])
         # Then: Also make sure that url with query-params is not there.
         self.assertNotIn('http://www.politico.com/story/2016/10/donald-trump-gop-ticket-229339#ixzz4MUelDXDC',
-                         [shared_url['url'] for shared_url in response.data])
+                         [shared_url['url'] for shared_url in response.data['results']])
 
     def test_tweet_links_individual(self):
         """Tests to confirm that fetching links shared by single account
@@ -212,14 +216,14 @@ works.
 
         """
         auth_token, created = models.AuthToken.objects.get_or_create(screen_name=self.me.screen_name)
-        url = reverse('links', kwargs={'uuid': auth_token.uuid})
+        url = reverse('urls', kwargs={'uuid': auth_token.uuid})
         # Do: Get a random UUID existing in records
         random_existing_uuid = models.TwitterAccount.objects.all().order_by('?').first().uuid
         # When: We make request with parameter 'links_of'
         response = self.client.get(url, data={'links_of': random_existing_uuid})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         time_threshold = timezone.now() - datetime.timedelta(hours=24)
-        self.assertEqual(len(response.data), models.UrlShared.objects.filter(shared_from__uuid=random_existing_uuid, url_shared__gte=time_threshold).count())
+        self.assertEqual(len(response.data['results']), models.UrlShared.objects.filter(shared_from__uuid=random_existing_uuid, url_shared__gte=time_threshold).count())
         # When: we use random UUID and query for links
         response = self.client.get(url, data={'links_of': str(uuid4())})
         # Then: we get 404, NotFound response
@@ -241,7 +245,7 @@ works.
         self.assertEqual(len(response.data['results']), models.TwitterStatus.objects.filter(followed_from__uuid=auth_token.uuid, status_created__gte=time_threshold).count())
 
         # When: we use random UUID and query for links
-        url = reverse('links', kwargs={'uuid': str(uuid4())})
+        url = reverse('urls', kwargs={'uuid': str(uuid4())})
         response = self.client.get(url)
         # Then: we get 404, NotFound response
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
