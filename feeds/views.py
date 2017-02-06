@@ -23,7 +23,6 @@ from django.http import QueryDict
 # from django.core.management import call_command
 from django.views.decorators.cache import never_cache
 from django.template.loader import get_template
-from django.template import RequestContext
 
 
 # http://stackoverflow.com/questions/34389485/implementing-push-notification-using-chrome-in-django
