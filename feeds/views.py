@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.shortcuts import redirect, render_to_response
-from django.http import JsonResponse, Http404
+from django.http import JsonResponse, Http404, HttpResponse
 from django.core.urlresolvers import reverse
 from rest_framework.serializers import ValidationError
 import tweepy
@@ -8,11 +8,10 @@ from feeds.tasks import update_accounts_task
 from django.contrib.auth import logout
 from feeds.models import UrlShared, TwitterStatus, TwitterAccount, AuthToken
 from feeds.serializers import UrlSerializer, StatusSerializer
-from rest_framework import viewsets, pagination, status
-from rest_framework.permissions import AllowAny
+from rest_framework import viewsets, status
 from rest_framework.response import Response
 from urllib import parse
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, detail_route
 from feedgen.feed import FeedGenerator
 from xml.etree.ElementTree import Element, SubElement, Comment
 from xml.dom import minidom
@@ -22,92 +21,107 @@ from django.utils import timezone
 from dateutil import parser
 from django.http import QueryDict
 # from django.core.management import call_command
+from django.views.decorators.cache import never_cache
+from django.template.loader import get_template
+from django.template import RequestContext
 
 
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny, ])
-def url_list(request, uuid):
-    if request.method == 'GET':
-        get_feed = request.query_params.get('feed', None)
-        seen = request.query_params.get('seen', False)
-        links_of = request.query_params.get('links_of', '')
-        if TwitterAccount.objects.filter(followed_from__uuid=uuid).exists():
-            accounts = TwitterAccount.objects.filter(followed_from__uuid=uuid)
-        else:
+# http://stackoverflow.com/questions/34389485/implementing-push-notification-using-chrome-in-django
+@never_cache
+def sw_js(request, js):
+    template = get_template('sw.js')
+    html = template.render(context={'uuid': request.GET.get('uuid', '')})
+    return HttpResponse(html, content_type="application/javascript")
+
+
+class UrlViewSet(viewsets.ModelViewSet):
+    serializer_class = UrlSerializer
+
+    def get_queryset(self):
+        uuid = self.kwargs.get('uuid', '')
+        if not uuid:
             raise Http404
-        if get_feed:
-            # FIXME: should we use dragnet for getting content of URL?
-            screen_name = accounts.first().followed_from.get(uuid=uuid).screen_name
-            feed_date = parser.parse(request.query_params.get('date', datetime.date.today().strftime('%d-%b-%Y')))
-            fg = FeedGenerator()
-            fg.id('https://twitter.com/%s' % screen_name)
-            fg.description('Links shared by people you follow')
-            fg.title(screen_name)
-            fg.author({'name': screen_name})
-            fg.link(href='https://twitter.com/%s' % screen_name, rel='alternate')
-            fg.language('en')
-            for link in UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_shared__gte=feed_date).order_by('url').distinct('url'):
-                fe = fg.add_entry()
-                fe.id(link.url)
-                fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
-                fe.title(link.url)
-                fe.content(link.url)
-                fe.pubdate(link.url_shared)
-            with open('feeds/static/xml/%s-feed.xml' % uuid, 'wb') as feed:
-                feed.write(fg.atom_str(pretty=True))
-            return Response({'xml_file': 'xml/%s-feed.xml' % uuid, 'date': feed_date.strftime('%d %b %Y')}, status=status.HTTP_200_OK)
-        else:
-            # To return links shared only in last 24 hours
-            time_threshold = timezone.now() - datetime.timedelta(hours=24)
-            if links_of:
-                if TwitterAccount.objects.filter(uuid=links_of):
-                    links = UrlShared.objects.filter(shared_from=links_of, url_seen=seen, url_shared__gte=time_threshold)
-                else:
-                    raise Http404
+        if not AuthToken.objects.filter(uuid=uuid).exists():
+            raise Http404
+        links_of = self.request.query_params.get('links_of', '')
+        if links_of:
+            if TwitterAccount.objects.filter(uuid=links_of).exists():
+                links = UrlShared.objects.filter(shared_from=links_of)
             else:
-                links = UrlShared.objects.filter(shared_from__in=[account.uuid for account in accounts], url_seen=seen, url_shared__gte=time_threshold)
-            serialized_links = UrlSerializer(links.order_by('url').distinct('url'), many=True)
-            return Response(serialized_links.data, status=status.HTTP_200_OK)
-    elif request.method == 'POST':
-        url_shared = request.data.get('url_shared', '')
-        if uuid:
-            try:
-                oauth_account = AuthToken.objects.get(uuid=uuid)
-                twitter_account = TwitterAccount.objects.get(screen_name=oauth_account.screen_name)
-            except AuthToken.DoesNotExist:
-                raise ValidationError('You are not authorized to archive link on this service')
-            parsed_url = parse.urlparse(url_shared)
-            # FIXME: YouTube URLs would be totally screwed by this.
-            cleaned_url = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
-            if cleaned_url:
-                url_obj, created = UrlShared.objects.get_or_create(url=cleaned_url)
-                if created:
-                    url_obj.save()
-                url_obj.shared_from.add(twitter_account)
-                url_obj.save()
-                serialized_obj = UrlSerializer(url_obj)
-                return Response(serialized_obj.data, status=status.HTTP_201_CREATED)
-            else:
-                raise ValidationError('Missing url.')
+                raise Http404
         else:
+            links = UrlShared.objects.filter(shared_from__followed_from__uuid=uuid)
+        return links
+
+    @detail_route()
+    def get_feed(self, request, uuid=None):
+        if not uuid:
+            raise Http404
+        if not AuthToken.objects.filter(uuid=uuid).exists():
+            raise Http404
+        screen_name = AuthToken.objects.get(uuid=uuid).screen_name
+        feed_date = parser.parse(self.request.query_params.get('date',
+                                                               datetime.date.today().strftime('%d-%b-%Y')))
+        fg = FeedGenerator()
+        fg.id('https://twitter.com/%s' % screen_name)
+        fg.description('Links shared by people you follow')
+        fg.title(screen_name)
+        fg.author({'name': screen_name})
+        fg.link(href='https://twitter.com/%s' % screen_name, rel='alternate')
+        fg.language('en')
+        for link in UrlShared.objects.filter(shared_from__followed_from__uuid=uuid, url_shared__gte=feed_date).order_by('url').distinct('url'):
+            fe = fg.add_entry()
+            fe.id(link.url)
+            fe.author({'name': ', '.join([shared_from.screen_name for shared_from in link.shared_from.all()])})
+            fe.title(link.url)
+            fe.content(link.url)
+            fe.pubdate(link.url_shared)
+        with open('feeds/static/xml/%s-feed.xml' % uuid, 'wb') as feed:
+            feed.write(fg.atom_str(pretty=True))
+        return Response({'xml_file': 'xml/%s-feed.xml' % uuid,
+                         'date': feed_date.strftime('%d %b %Y')},
+                        status=status.HTTP_200_OK)
+
+    @detail_route(methods=['post'])
+    def share_url(self, request, uuid=None):
+        if not uuid:
             raise ValidationError('You are not authorized to archive link on this service')
+        if not AuthToken.objects.filter(uuid=uuid).exists():
+            raise ValidationError('You are not authorized to archive link on this service')
+        url_shared = request.data.get('url_shared', '')
+        try:
+            oauth_account = AuthToken.objects.get(uuid=uuid)
+            twitter_account = TwitterAccount.objects.get(screen_name=oauth_account.screen_name)
+        except AuthToken.DoesNotExist:
+            raise ValidationError('You are not authorized to archive link on this service')
+        parsed_url = parse.urlparse(url_shared)
+        # FIXME: YouTube URLs would be totally screwed by this.
+        cleaned_url = parsed_url.scheme + "://" + parsed_url.netloc + parsed_url.path
+        if cleaned_url:
+            if UrlShared.objects.filter(url=cleaned_url).exists():
+                url_obj = UrlShared.objects.get(url=cleaned_url)
+            else:
+                url_obj = UrlShared.objects.create(url=cleaned_url, url_shared=timezone.now())
+            url_obj.shared_from.add(twitter_account)
+            url_obj.save()
+            serialized_obj = UrlSerializer(url_obj)
+            return Response(serialized_obj.data, status=status.HTTP_201_CREATED)
+        else:
+            raise ValidationError('Missing url.')
 
 
 class StatusViewSet(viewsets.ModelViewSet):
-    lookup_field = 'followed_from__uuid'
     serializer_class = StatusSerializer
-    pagination_class = pagination.PageNumberPagination
 
     def get_queryset(self):
         uuid = self.kwargs["uuid"]
         seen = self.request.query_params.get("seen", False)
         if not AuthToken.objects.filter(uuid=uuid).exists():
             raise Http404
-        time_threshold = timezone.now() - datetime.timedelta(hours=24)
         if seen:
-            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_created__gte=time_threshold)
+            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen)
         else:
-            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid, status_seen=seen, status_created__gte=time_threshold)
+            statuses = TwitterStatus.objects.filter(followed_from__uuid=uuid)
         return statuses
 
 
@@ -225,6 +239,7 @@ def get_verification(request):
         screen_name=me.screen_name)
     auth_token.access_token = auth.access_token
     auth_token.access_token_secret = auth.access_token_secret
+    auth_token.me_json = me._json
     auth_token.save()
 
     request.session.pop('request_token')
