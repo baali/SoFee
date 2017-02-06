@@ -91,8 +91,11 @@ def fetch_links(self, link_uuid):
             # link_obj.save()
             parsed_content = json.loads(response.stdout.decode('utf-8'))
             if parsed_content:
-                link_obj.cleaned_text = '<h4>' + parsed_content['title'] + '</h4>'\
-                                        + parsed_content['content']
+                link_obj.cleaned_text = parsed_content['content']
+                link_obj.url_json = {'title': parsed_content['title'],
+                                     'excerpt': parsed_content.get('excerpt', ''),
+                                     'byline': parsed_content.get('byline', ''),
+                                     'textContent': parsed_content['textContent'], }
                 link_obj.save()
             else:
                 print('Got nothing from url: %s for %s' % (link_obj.url, response.stdout))
@@ -138,6 +141,7 @@ def update_accounts_task(self, uuid=''):
                 twitter_account.save()
                 twitter_account.followed_from.add(auth_token)
 
+            twitter_account.account_json = friend._json
             if TwitterStatus.objects.filter(tweet_from=twitter_account).exists():
                 recent_status = TwitterStatus.objects.filter(tweet_from=twitter_account).first()
                 status_id = path.split(recent_status.status_url)[-1]
@@ -191,8 +195,8 @@ def update_accounts_task(self, uuid=''):
                             continue
                         link_obj, created = UrlShared.objects.get_or_create(
                             url=url_entity['expanded_url'],
-                            quoted_text=text)
-                        link_obj.url_shared = pytz.utc.localize(status.created_at)
+                            quoted_text=text,
+                            url_shared=pytz.utc.localize(status.created_at))
                         if created:
                             link_obj.save()
                         if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
