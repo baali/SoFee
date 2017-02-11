@@ -241,7 +241,7 @@ works.
         url = reverse('statuses', kwargs={'uuid': auth_token.uuid})
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data['results']), models.TwitterStatus.objects.filter(followed_from__uuid=auth_token.uuid).count())
+        self.assertEqual(response.data['count'], models.TwitterStatus.objects.filter(followed_from__uuid=auth_token.uuid).count())
 
         # When: we use random UUID and query for links
         url = reverse('urls', kwargs={'uuid': str(uuid4())})
