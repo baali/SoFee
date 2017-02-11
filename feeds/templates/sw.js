@@ -42,11 +42,24 @@ self.addEventListener('activate', function(event) {
 
 
 self.addEventListener('push', function(event) {
-  console.log('Push message received', event);
-  var options = {
-    body: "Body",
+  console.log('Push message received', event.data.json().data.uuid);
+  if (event.data.json().data.uuid !== undefined) {
+    // self.registration.showNotification("Updating your feed!");
+    fetch("/urls/"+event.data.json().data.uuid+"/").then(function(response) {
+      var cache_response = response.clone();
+      response.json().then(function(data) {
+        console.log('Returning cached response', self.clients.matchAll());
+        self.clients.matchAll().then(function(clients) {
+          clients.forEach(function(client) {
+            client.postMessage(data);
+          })
+        });
+      });
+      caches.open(CACHE).then(function (cache) {
+        cache.put("/urls/"+event.data.json().data.uuid+"/", cache_response);
+      });
+    });
   }
-  self.registration.showNotification("Title");
 });
 
 self.addEventListener('message', function(event) {
