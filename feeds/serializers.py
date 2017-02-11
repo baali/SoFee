@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from feeds.models import UrlShared, TwitterStatus, TwitterAccount
+from feeds.models import PushNotificationToken, TwitterAccount,\
+    UrlShared, TwitterStatus
 
 
 class SmallerSetJsonField(serializers.JSONField):
@@ -36,3 +37,11 @@ class StatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = TwitterStatus
         fields = ('uuid', 'tweet_from', 'followed_from', 'status_text', 'status_created', 'status_seen', 'status_url')
+
+
+class PushNotificationSerializer(serializers.ModelSerializer):
+    token_for = TwitterAccountSerializer(read_only=True)
+
+    class Meta:
+        model = PushNotificationToken
+        fields = ('token', 'token_for', 'notification')
