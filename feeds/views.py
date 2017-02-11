@@ -23,6 +23,7 @@ from django.http import QueryDict
 # from django.core.management import call_command
 from django.views.decorators.cache import never_cache
 from django.template.loader import get_template
+from django.template import RequestContext
 
 
 # http://stackoverflow.com/questions/34389485/implementing-push-notification-using-chrome-in-django
@@ -198,7 +199,12 @@ def check_key(request):
 
 
 def index(request, uuid=''):
-    return render_to_response('layout.html', {'uuid': uuid, 'task_id': request.GET.get('task_id', '')})
+    return render_to_response('layout.html',
+                              {'uuid': uuid,
+                               'task_id': request.GET.get('task_id', ''),
+                               'fcm_web_api_key': settings.FCM_WEB_API_KEY,
+                               'fcm_id': settings.FCM_ID},
+                              context_instance=RequestContext(request))
 
 
 def oauth_dance(request):
