@@ -14,8 +14,10 @@ self.addEventListener('install', function(event) {
         "{% static "js/jquery-2.1.1.min.js" %}",
         "{% static "js/materialize.js" %}",
         "{% static "js/status.js" %}",
+        {% if uuid %}
         "/index/{{ uuid }}/",
         "/urls/{{ uuid }}/",
+        {% endif %}
       ]);
     })
   );
