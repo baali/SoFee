@@ -24,6 +24,16 @@ class TwitterAccount(UUIDMixin):
         return self.screen_name
 
 
+class PushNotificationToken(UUIDMixin):
+    token = models.CharField(max_length=512, unique=True)
+    token_for = models.ForeignKey(TwitterAccount, on_delete=models.DO_NOTHING)
+    active = models.BooleanField(default=True)
+    details = JSONField(default={})
+
+    def __str__(self):
+        return 'token: %s for user: %s' % (self.token, self.token_for.screen_name)
+
+
 class TwitterStatus(UUIDMixin):
     tweet_from = models.ForeignKey(TwitterAccount, on_delete=models.CASCADE)
     followed_from = models.ForeignKey(AuthToken, on_delete=models.CASCADE)
