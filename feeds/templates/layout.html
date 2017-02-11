@@ -76,8 +76,18 @@
     </footer>
     <script type="text/javascript" src="{% static "js/jquery-2.1.1.min.js" %}"></script>
     <script type="text/javascript" src="{% static "js/materialize.js" %}"></script>
+    <script type="text/javascript" src="{% static "js/firebase.js" %}"></script>
     <script>
       const uuid = "{{ uuid }}";
+      // Initialize Firebase
+      var config = {
+        apiKey: "{{ fcm_web_api_key }}",
+        authDomain: "so-fee.firebaseapp.com",
+        databaseURL: "https:so-fee.firebaseio.com",
+        storageBucket: "so-fee.appspot.com",
+        messagingSenderId: "{{ fcm_id }}"
+      };
+      firebase.initializeApp(config);
       if (navigator.serviceWorker) {
         if (navigator.serviceWorker.controller) {
           console.log('Service worker is already installed');
