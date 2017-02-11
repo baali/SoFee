@@ -23,15 +23,18 @@ self.addEventListener('install', function(event) {
 
 
 self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request).then(function(response) {
-      return response || fetch(event.request).then(function(response) {
-        caches.open(CACHE).then(function(cache) {
-          return cache.put(event.request, response);
+  if (event.request.method === 'GET') {
+    event.respondWith(
+      caches.match(event.request).then(function(response) {
+        console.log(event.request.url, response);
+        return response || fetch(event.request).then(function(response) {
+          caches.open(CACHE).then(function(cache) {
+            return cache.put(event.request, response);
+          });
         });
-      });
-    })
-  );
+      })
+    );
+  }
 });
 
 
