@@ -6,9 +6,12 @@ from rest_framework.serializers import ValidationError
 import tweepy
 from feeds.tasks import update_accounts_task
 from django.contrib.auth import logout
-from feeds.models import UrlShared, TwitterStatus, TwitterAccount, AuthToken
-from feeds.serializers import UrlSerializer, StatusSerializer
+from feeds.models import AuthToken, TwitterAccount, UrlShared, \
+    TwitterStatus, PushNotificationToken
+from feeds.serializers import UrlSerializer, StatusSerializer, \
+    PushNotificationSerializer
 from rest_framework import viewsets, status
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from urllib import parse
 from rest_framework.decorators import api_view, detail_route
@@ -142,7 +145,7 @@ def opml(request, uuid):
         dm.text = generated_on
 
         body = SubElement(root, 'body')
-        host_uri = 'http://' + request.get_host()
+        host_uri = 'https://' + request.get_host()
         SubElement(body, 'outline',
                    {'text': 'Links',
                     'title': 'Feeds of all links shared by people you follow.',
@@ -269,3 +272,26 @@ def get_status(request):
         return JsonResponse({'task_status': task.state, 'info': task.result, })
     else:
         return JsonResponse({'task_status': task.state, 'message': 'It is lost'})
+
+
+class PushTokenList(APIView):
+    """
+    Create PushToken for WebPush.
+    """
+    def post(self, request, format=None):
+        uuid = request.data.get('uuid', '')
+        if not uuid:
+            raise ValidationError('You are not authorized to archive link on this service')
+        try:
+            oauth_account = AuthToken.objects.get(uuid=uuid)
+            twitter_account = TwitterAccount.objects.get(screen_name=oauth_account.screen_name)
+        except AuthToken.DoesNotExist:
+            raise ValidationError('You are not authorized to archive link on this service')
+        push_token, created = PushNotificationToken.objects.get_or_create(token=request.data['token'],
+                                                                          token_for=twitter_account)
+        serializer = PushNotificationSerializer(push_token)
+        if created:
+            push_token.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
