@@ -1,4 +1,6 @@
 var link_details = {}
+
+const messaging = firebase.messaging();
 $( document ).ready(function(){
   $(".button-collapse").sideNav();
   $('.modal').modal();
@@ -14,6 +16,34 @@ $( document ).ready(function(){
        }
     }
   });
+  messaging.requestPermission()
+    .then(function() {
+      console.log('Notification permission granted.');
+    })
+    .catch(function(err) {
+      console.log('Unable to get permission to notify.', err);
+    });
+  messaging.getToken()
+    .then(function(currentToken) {
+      if (currentToken && uuid !== undefined) {
+        console.log(currentToken);
+        fetch("/push_token/", {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: "POST",
+          body: JSON.stringify({uuid: uuid,
+                                token: currentToken}),
+        }).then(function(response) {
+          console.log(response.json());
+        });
+        // Communicate it to server.
+      } else {
+        console.log('No Instance ID token available. Request permission to generate one.');
+      }
+    }).catch(function(err) {
+      console.log('An error occurred while retrieving token. ', err);
+    });
 })
 
 function sleep (time) {
