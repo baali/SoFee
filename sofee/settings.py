@@ -147,6 +147,7 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ROUTES = {
     'feeds.tasks.update_feed': {'queue': 'feed_queue'},
     'feeds.tasks.update_accounts_task': {'queue': 'default'},
+    'feeds.tasks.update_user_cache': {'queue': 'default'},
     'feeds.tasks.fetch_links': {'queue': 'fetch_link'},
     'feeds.tasks.update_rss_task': {'queue': 'rss_queue'},
 }

@@ -11,10 +11,11 @@ import tweepy
 from Naked.toolshed.shell import muterun_js
 import json
 from django.utils import timezone
-from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus
+from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus, PushNotificationToken
 from sofee.celery import app
 import requests
 from urllib import parse
+from pyfcm import FCMNotification
 
 
 def valid_xml_char_ordinal(c):
@@ -31,6 +32,39 @@ def valid_xml_char_ordinal(c):
         0xE000 <= codepoint <= 0xFFFD or
         0x10000 <= codepoint <= 0x10FFFF
     )
+
+
+@app.task(bind=True)
+def update_user_cache(self, uuid):
+    fcm_id_info_url = 'https://iid.googleapis.com/iid/info/'
+    headers = {'Authorization': 'key=' + settings.FCM_API_KEY,
+               'Content-Type': 'application/json; charset=UTF-8'}
+    try:
+        auth_token = AuthToken.objects.get(uuid=uuid)
+        twitter_account = TwitterAccount.objects.get(screen_name=auth_token.screen_name)
+    except AuthToken.DoesNotExist:
+        return
+    except TwitterAccount.DoesNotExist:
+        return
+    push_service = FCMNotification(api_key=settings.FCM_API_KEY)
+    for p_token in PushNotificationToken.objects.filter(token_for=twitter_account, active=True):
+        details = requests.get(fcm_id_info_url + p_token.token,
+                               headers=headers,
+                               params={'details': 'true'})
+        p_token.details = details.json()
+        p_token.save()
+        if details.status_code == 404:
+            # Instance ID has expired
+            p_token.active = False
+            p_token.save()
+        elif details.status_code == 200:
+            data_msg = {'Title': 'Updated your timeline.',
+                        'uuid': uuid}
+            result = push_service.notify_single_device(registration_id=p_token.token, data_message=data_msg)
+            try:
+                assert result['success'] == 1
+            except AssertionError:
+                print('Failed to push updates for {} for ID: {}, IID result: {}'.format(auth_token.screen_name, p_token.token, details.json()))
 
 
 @app.task(bind=True)
@@ -206,6 +240,7 @@ def update_accounts_task(self, uuid=''):
             print('Updated', friend.screen_name, 'Added', count, 'Tweets')
             twitter_account.save()
         update_feed.apply_async([str(auth_token.uuid)])
+        update_user_cache.apply_async([str(auth_token.uuid)])
     return 'Successfully updated accounts.'
 
 
