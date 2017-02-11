@@ -43,4 +43,5 @@ urlpatterns = [
     url(r'^urls/(?P<uuid>[a-zA-Z0-9-]+)/share_url/$', share_url, name='share_url'),
     url(r'^api-auth/(?P<uuid>[a-zA-Z0-9-]+)/', include('rest_framework.urls', namespace='rest_framework')),
     url(r'^(.*.js)$', views.sw_js, name='sw_js'),
+    url(r'^push_token/$', views.PushTokenList.as_view()),
 ]
