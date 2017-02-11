@@ -170,3 +170,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
 }
+
+# FCM Configs
+FCM_WEB_API_KEY = get_env('FCM_WEB_API_KEY')
+FCM_ID = get_env('FCM_ID')
+FCM_API_KEY = get_env('FCM_API_KEY')
