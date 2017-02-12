@@ -17,6 +17,7 @@ self.addEventListener('install', function(event) {
         {% if uuid %}
         "/index/{{ uuid }}/",
         "/urls/{{ uuid }}/",
+        "/status/{{ uuid }}/",
         {% endif %}
       ]);
     })
@@ -28,7 +29,6 @@ self.addEventListener('fetch', function(event) {
   if (event.request.method === 'GET') {
     event.respondWith(
       caches.match(event.request).then(function(response) {
-        console.log(event.request.url, response);
         return response || fetch(event.request).then(function(response) {
           caches.open(CACHE).then(function(cache) {
             return cache.put(event.request, response);
