@@ -26,6 +26,9 @@ self.addEventListener('install', function(event) {
 
 
 self.addEventListener('fetch', function(event) {
+  if (event.request.mode === 'no-cors') {
+    return;
+  }
   if (event.request.method === 'GET') {
     event.respondWith(
       caches.match(event.request).then(function(response) {
