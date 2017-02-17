@@ -133,6 +133,7 @@ function get_links(uuid) {
     return
   }
   $('.button-collapse').sideNav('hide');
+  $('#tweets').empty();
   if (navigator.serviceWorker.controller) {
     navigator.serviceWorker.onmessage = function(event) {
       console.log('Service worker returned a message!');
@@ -180,7 +181,6 @@ function get_links(uuid) {
     console.log('Making our own JS Request!');
     $.get("/urls/"+uuid+"/")
       .done( function(data) {
-        $('#tweets').empty();
         link_details = {};
         $.each(data.results, function(index, obj) {
           var shared_from = "";
