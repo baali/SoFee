@@ -102,30 +102,43 @@ function get_status(uuid) {
   }
   $('.button-collapse').sideNav('hide');
   var return_status = '';
-  var next_page = '';
-  $.get("/status/"+uuid+"/")
-    .done( function(data) {
+  // var next_page = '';
+  // $.get("/status/"+uuid+"/")
+  //   .done( function(data) {
+  fetch("/status/"+uuid+"/").then(function(response) {
+    response.json().then(function(data) {
+      next_page = data.next;
       $('#tweets').empty();
-      next_page = data['next'];
-      $.each(data['results'], function(index, obj) {
+      data.results.forEach(function(obj, index, array) {
+        if ('profile_image_url' in obj.tweet_from.account_json) {
+          shared_from =
+            $('<div class="chip">').append(
+              $('<a>').attr('href', obj.tweet_from.account_json.url).append(
+                $('<img class="circle responsive-img">').attr('src', obj.tweet_from.account_json.profile_image_url)).attr(
+                  'target', '_blank').append(obj.tweet_from.account_json.screen_name));
+        }
+        else {
+          shared_from += obj.tweet_from.screen_name+' ';
+        }
         $('#tweets').append(
           $('<li class="collection-item">').append(
-            $('<span>').text(obj.tweet_from['screen_name']+' : '+obj.status_text)
-          ));
+            $('<div>').append(shared_from).append(
+              $('<span>').text(obj.status_text)
+            )
+          )
+        );
       });
       var last_li = $('li').last();
       last_li.attr('id', 'last_li');
       var options = [
-        {selector: '#last_li', offset: 190, callback: function(el) {
+        {selector: '#last_li', offset: 50, callback: function(el) {
           // Materialize.toast("This is our ScrollFire Demo!", 1500 );
           update_feed(next_page);
-        } },
+        }},
       ]
       Materialize.scrollFire(options);
-    })
-    .fail(function() {
-      $("#tweets").html("<p>Sorry we don't have records for this Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
     });
+  });
 }
 
 function get_links(uuid) {
