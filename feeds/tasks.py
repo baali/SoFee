@@ -126,7 +126,7 @@ def fetch_links(self, link_uuid):
             parsed_content = json.loads(response.stdout.decode('utf-8'))
             if parsed_content:
                 link_obj.cleaned_text = parsed_content['content']
-                link_obj.url_json = {'title': parsed_content['title'],
+                link_obj.url_json = {'title': parsed_content['title'].strip(),
                                      'excerpt': parsed_content.get('excerpt', ''),
                                      'byline': parsed_content.get('byline', ''),
                                      'textContent': parsed_content['textContent'], }
