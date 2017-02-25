@@ -110,6 +110,7 @@ function update_feed(url) {
               shared_from += name.screen_name+' ';
             }
           });
+          link_details[obj.uuid] = obj.cleaned_text;
           $('#tweets').append(
             $('<li class="collection-item">').append(
               $('<div>').append(shared_from).append(
