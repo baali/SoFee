@@ -214,7 +214,7 @@ def oauth_dance(request):
     auth = tweepy.OAuthHandler(
         settings.TWITTER_CONSUMER_KEY,
         settings.TWITTER_CONSUMER_SECRET,
-        'http://' + request.get_host() + '/verify/'
+        'https://' + request.get_host() + '/verify/'
     )
     try:
         # get the request tokens
