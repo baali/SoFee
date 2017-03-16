@@ -67,7 +67,7 @@ function sleep (time) {
 function get_task_status(uuid, task_id) {
   $.get("/get_task_status/", {'task_id':task_id})
     .done( function(data) {
-      if (data['task_status'] === 'PROGRESS') {
+      if (data['task_status'] === 'PROGRESS' || data['task_status'] === 'RECEIVED' || data['task_status'] === 'PENDING') {
         Materialize.toast(data['info'], 1000);
         Materialize.toast('Processed '+data['count']+' out of '+data['total_count']+' Accounts you follow.', 1000);
         // http://stackoverflow.com/a/951057
@@ -77,7 +77,7 @@ function get_task_status(uuid, task_id) {
       } else if (data['task_status'] === 'SUCCESS') {
         Materialize.toast(data['info'], 1000);
       } else {
-        $("#tweets").html("<p>Sorry there was issue while processing your Twitter account. Please contact baali@muse-amuse.in for clarifications.<br/></p>");
+        $("#tweets").html("<p>Sorry there was issue while processing your Twitter account. Please contact baali[at]muse-amuse.in for clarifications.<br/></p>");
       }      
     });
 }
