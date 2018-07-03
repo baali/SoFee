@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.shortcuts import redirect, render_to_response
 from django.http import JsonResponse, Http404, HttpResponse
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from rest_framework.serializers import ValidationError
 import tweepy
 from feeds.tasks import update_accounts_task

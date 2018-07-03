@@ -4,8 +4,9 @@ import tweepy
 import pytz
 from django.contrib.staticfiles import finders
 from django.test import Client
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from feeds import models
+from feeds.tasks import fetch_links
 import datetime
 from rest_framework import status
 from uuid import uuid4
@@ -48,14 +49,14 @@ class FeedsTest(TestCase):
             twitter_account.followed_from.add(auth_token)
             twitter_account.last_updated = last_updated
             twitter_account.save()
-            statuses = cls.api.user_timeline(screen_name=friend.screen_name)
+            statuses = cls.api.user_timeline(screen_name=friend.screen_name, tweet_mode='extended')
             for tweet in statuses:
                 if pytz.utc.localize(tweet.created_at) > twitter_account.last_updated:
                     twitter_account.last_updated = pytz.utc.localize(tweet.created_at)
-                if getattr(tweet, 'retweeted_status', None) and tweet.text.endswith(u'\u2026'):
-                    text = twitter_account.screen_name + ' Retweeted ' + tweet.retweeted_status.author.screen_name + ': ' + tweet.retweeted_status.text
+                if getattr(tweet, 'retweeted_status', None) and tweet.full_text.endswith(u'\u2026'):
+                    text = twitter_account.screen_name + ' Retweeted ' + tweet.retweeted_status.author.screen_name + ': ' + tweet.retweeted_status.full_text
                 else:
-                    text = tweet.text
+                    text = tweet.full_text
                 created_at = pytz.utc.localize(tweet.created_at)
                 url = 'https://twitter.com/' + twitter_account.screen_name + '/status/' + tweet.id_str
                 status_obj = models.TwitterStatus(
@@ -73,16 +74,19 @@ class FeedsTest(TestCase):
                         time_threshold = timezone.now() - datetime.timedelta(hours=24)
                         if pytz.utc.localize(tweet.created_at) < time_threshold:
                             continue
-                        if url_entity.get('expanded_url', ''):
-                            link_obj, created = models.UrlShared.objects.get_or_create(url=url_entity['expanded_url'],
-                                                                                       url_shared=pytz.utc.localize(tweet.created_at))
-                            if created:
-                                link_obj.save()
-                            if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
-                                link_obj.shared_from.add(twitter_account)
+                        expanded_url = url_entity.get('expanded_url', '').strip()
+                        if len(expanded_url) > 200 or expanded_url == False:
+                            print("skipping url %s" %expanded_url)
+                            continue
+                        link_obj, created = models.UrlShared.objects.get_or_create(url=url_entity['expanded_url'],
+                                                                                   url_shared=pytz.utc.localize(tweet.created_at))
+                        if created:
                             link_obj.save()
-                            cls.link_timestamps.append((link_obj.uuid, pytz.utc.localize(tweet.created_at)))
-            if models.UrlShared.objects.count() >= 10:
+                        if not link_obj.shared_from.filter(uuid=twitter_account.uuid).exists():
+                            link_obj.shared_from.add(twitter_account)
+                        link_obj.save()
+                        cls.link_timestamps.append((link_obj.uuid, pytz.utc.localize(tweet.created_at)))
+            if models.UrlShared.objects.count() >= 20:
                 cls.link_count = models.UrlShared.objects.count()
                 break
             friends_counter += 1
@@ -255,7 +259,27 @@ works.
             link_obj = models.UrlShared.objects.get(uuid=uuid)
             self.assertEqual(link_obj.url_shared, timestamp)
 
+    def test_download_link_content(self):
+        """Test to make sure our task fetch_links is able to download text
+        content of URLs.
+
+        """
+        for (uuid, timestamp) in self.link_timestamps:
+            link_obj = models.UrlShared.objects.get(uuid=uuid)
+            fetch_links(link_obj.uuid)
+            # Cached object won't have updated fields, we have to
+            # GET it again.
+            link_obj = models.UrlShared.objects.get(uuid=uuid)
+            if link_obj.url.startswith('https://twitter.com/'):
+                self.assertTrue(len(link_obj.cleaned_text) > 0)
+            elif link_obj.cleaned_text:
+                self.assertTrue(len(link_obj.cleaned_text) > 0)
+                self.assertTrue(len(link_obj.url_json) > 0)
+            else:
+                self.assertTrue(len(link_obj.cleaned_text) == 0)
+                
     def test_archived_links(self):
+
         """Tests to make sure links shared on timeline are getting archived.
         # WHAT ABOUT - articles behind paywall/logins
 
@@ -264,7 +288,7 @@ works.
 
     def test_fetch_deleted_account(self):
         """Tests to make sure task to fetch statuses works fine in case
-account is deleted/removed.
+        account is deleted/removed.
 
         """
         pass

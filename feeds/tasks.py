@@ -8,8 +8,9 @@ from django.contrib.staticfiles.templatetags.staticfiles import static
 from feedgen.feed import FeedGenerator
 import pytz
 import tweepy
-from Naked.toolshed.shell import muterun_js
 import json
+from newspaper import Article
+from newspaper.article import ArticleDownloadState
 from django.utils import timezone
 from feeds.models import AuthToken, TwitterAccount, UrlShared, TwitterStatus, PushNotificationToken
 from sofee.celery import app
@@ -110,6 +111,7 @@ def fetch_links(self, link_uuid):
     try:
         link_obj = UrlShared.objects.get(uuid=link_uuid)
     except UrlShared.DoesNotExist:
+        print("Couldn't find link with uuid: %s" %link_uuid)
         return
 
     if link_obj.url.startswith('https://twitter.com/'):
@@ -118,23 +120,21 @@ def fetch_links(self, link_uuid):
             link_obj.cleaned_text = tweet_embedded.json()['html']
             link_obj.save()
     else:
-        response = muterun_js('feeds/static/js/get_content.js', link_obj.url)
-        if response.exitcode == 0 and response.stdout:
-            # parsed_content = json.loads(response.stdout.decode('utf-8'))
-            # link_obj.cleaned_text = response.stdout.decode('utf-8')
-            # link_obj.save()
-            parsed_content = json.loads(response.stdout.decode('utf-8'))
-            if parsed_content:
-                link_obj.cleaned_text = parsed_content['content']
-                link_obj.url_json = {'title': parsed_content['title'].strip(),
-                                     'excerpt': parsed_content.get('excerpt', ''),
-                                     'byline': parsed_content.get('byline', ''),
-                                     'textContent': parsed_content['textContent'], }
+        article = Article(link_obj.url)
+        article.download()
+        if article.download_state == ArticleDownloadState.FAILED_RESPONSE:
+            print('Not able to fetch url: %s for %s' % (link_obj.url, response.stderr))
+        else:
+            article.parse()
+            if article.text.strip():
+                link_obj.cleaned_text = article.text
+                link_obj.url_json = {'authors': article.authors,
+                                     'title': article.title,
+                                     'excerpt': article.meta_description,
+                                     'tags': ', '.join(article.tags)}
                 link_obj.save()
             else:
-                print('Got nothing from url: %s for %s' % (link_obj.url, response.stdout))
-        else:
-            print('Not able to fetch url: %s for %s' % (link_obj.url, response.stderr))
+                print('Got empty page from url: %s' % (link_obj.url))
 
 
 @app.task(bind=True)
@@ -179,9 +179,9 @@ def update_accounts_task(self, uuid=''):
             if TwitterStatus.objects.filter(tweet_from=twitter_account).exists():
                 recent_status = TwitterStatus.objects.filter(tweet_from=twitter_account).first()
                 status_id = path.split(recent_status.status_url)[-1]
-                statuses = api.user_timeline(screen_name=friend.screen_name, since_id=status_id)
+                statuses = api.user_timeline(screen_name=friend.screen_name, since_id=status_id, tweet_mode='extended')
             else:
-                statuses = api.user_timeline(screen_name=friend.screen_name)
+                statuses = api.user_timeline(screen_name=friend.screen_name, tweet_mode='extended')
             # Check if there were no recent updates in the timeline by the author
             if not [status for status in statuses if status.author.screen_name == friend.screen_name and pytz.utc.localize(status.created_at) > twitter_account.last_updated]:
                 continue
@@ -198,10 +198,10 @@ def update_accounts_task(self, uuid=''):
                 count += 1
                 if TwitterStatus.objects.filter(status_url=url).exists():
                     continue
-                if getattr(status, 'retweeted_status', None) and status.text.endswith(u'\u2026'):
-                    text = status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.text
+                if getattr(status, 'retweeted_status', None) and status.full_text.endswith(u'\u2026'):
+                    text = status.retweeted_status.author.screen_name + ': ' + status.retweeted_status.full_text
                 else:
-                    text = status.text
+                    text = status.full_text
                 tweeted_at = pytz.utc.localize(status.created_at)
                 status_obj = TwitterStatus(
                     tweet_from=twitter_account,
